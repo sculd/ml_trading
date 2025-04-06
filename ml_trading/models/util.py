@@ -1,16 +1,32 @@
 import numpy as np
 from sklearn.metrics import mean_absolute_error, r2_score
+from typing import Dict, Any
 
 
-def get_metrics(y_test, y_pred, prediction_threshold):
+def get_metrics(y_test: np.ndarray, y_pred: np.ndarray, prediction_threshold: float) -> Dict[str, float]:
+    """
+    Calculate various metrics for model evaluation.
+    
+    Args:
+        y_test: True labels
+        y_pred: Predicted values
+        prediction_threshold: Threshold for determining neutral predictions
+        
+    Returns:
+        Dictionary of evaluation metrics
+    """
     # Convert continuous predictions to discrete classes using threshold
     y_pred_discrete = np.zeros_like(y_pred)
     y_pred_discrete[y_pred > prediction_threshold] = 1
     y_pred_discrete[y_pred < -prediction_threshold] = -1
     
-    # Calculate accuracy
+    # Calculate overall accuracy
     correct_prediction = y_pred_discrete == y_test
     accuracy = np.mean(correct_prediction)
+    
+    # Calculate non-zero prediction accuracy (when model makes a directional call)
+    non_zero_predictions = y_pred_discrete != 0
+    non_zero_accuracy = np.mean(correct_prediction[non_zero_predictions]) if np.any(non_zero_predictions) else 0.0
     
     total_positive = len(y_pred_discrete[y_test > 0])
     total_neutral = len(y_pred_discrete[y_test == 0])
@@ -48,11 +64,12 @@ def get_metrics(y_test, y_pred, prediction_threshold):
     print_precision_breakdown('neutral', y_pred_discrete == 0, total_pred_neutral)
     print_precision_breakdown('negative', y_pred_discrete == -1, total_pred_negative)
     
-    # Calculate evaluation metrics
+    # Calculate class-specific metrics
     metrics = {
         'mae': mean_absolute_error(y_test, y_pred),
         'r2': r2_score(y_test, y_pred),
         'accuracy': accuracy,
+        'non_zero_accuracy': non_zero_accuracy,
         'positive_precision': np.sum((y_pred_discrete == 1) & (y_test > 0)) / np.sum(y_pred_discrete == 1),
         'positive_recall': np.sum((y_pred_discrete == 1) & (y_test > 0)) / np.sum(y_test > 0),
         'neutral_precision': np.sum((y_pred_discrete == 0) & (y_test == 0)) / np.sum(y_pred_discrete == 0),
@@ -60,4 +77,9 @@ def get_metrics(y_test, y_pred, prediction_threshold):
         'negative_precision': np.sum((y_pred_discrete == -1) & (y_test < 0)) / np.sum(y_pred_discrete == -1),
         'negative_recall': np.sum((y_pred_discrete == -1) & (y_test < 0)) / np.sum(y_test < 0),
     }
+    
+    # Print metrics
+    for k in sorted(metrics.keys()):
+        print(f"{k}: {metrics[k]:.2f}")
+    
     return metrics

@@ -8,7 +8,9 @@ import ml_trading.models.util
 
 
 def train_xgboost_model(
-    data: pd.DataFrame,
+    #data_df: pd.DataFrame,
+    train_df: pd.DataFrame,
+    validation_df: pd.DataFrame,
     target_column: str,
     test_size: float = 0.2,
     random_state: int = 42,
@@ -19,7 +21,7 @@ def train_xgboost_model(
     Train an XGBoost model on the provided data.
     
     Args:
-        data: DataFrame containing features and target
+        data_df: DataFrame containing features and target
         target_column: Name of the target column to predict
         test_size: Proportion of data to use for testing
         random_state: Random seed for reproducibility
@@ -32,29 +34,39 @@ def train_xgboost_model(
         - Dictionary of evaluation metrics
     """
     # Drop the symbol column
-    data = data.drop('symbol', axis=1)
-    
-    # Drop all label_ columns except the target column to prevent look-ahead bias
-    label_columns = [col for col in data.columns if col.startswith('label_') and col != target_column]
-    data = data.drop(label_columns, axis=1)
-    for col in ["open", "high", "low", "close", "volume"]:
-        assert col not in data.columns    
 
-    # Handle missing values
-    data = data.fillna(method='ffill').fillna(method='bfill')
-    
-    # Split features and target
-    X = data.drop(target_column, axis=1)
-    y = data[target_column]
-    #y[y == -1] = 0
-    print(X.info())
-    print(y.info())
+    def process_data(data_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+        data_df = data_df.drop('symbol', axis=1)
+        
+        # Drop all label_ columns except the target column to prevent look-ahead bias
+        label_columns = [col for col in data_df.columns if col.startswith('label_') and col != target_column]
+        data_df = data_df.drop(label_columns, axis=1)
+        for col in ["open", "high", "low", "close", "volume"]:
+            assert col not in data_df.columns    
+
+        # Handle missing values
+        data_df = data_df.ffill().bfill()
+        
+        # Split features and target
+        X = data_df.drop(target_column, axis=1)
+        y = data_df[target_column]
+        #y[y == -1] = 0
+
+        return X, y
+
+    X_train, y_train = process_data(train_df)
+    X_test, y_test = process_data(validation_df)
     
     # Split into train and test sets
+    '''
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state
     )
+    '''
+    #print(X_train.info())
+    #print(X_test.info())
     
+
     # Print target label distribution in test set
     print("\nTest set target label distribution:")
     total_samples = len(y_test)
@@ -91,4 +103,4 @@ def train_xgboost_model(
     # Make predictions
     y_pred = model.predict(X_test)
 
-    return model, ml_trading.models.utilget_metrics(y_test, y_pred, prediction_threshold)
+    return model, ml_trading.models.util.get_metrics(y_test, y_pred, prediction_threshold)
