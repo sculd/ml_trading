@@ -6,6 +6,7 @@ import importlib
 import pandas as pd
 import numpy as np
 import market_data.util.time
+import ml_trading.machine_learning.util
 
 logging.basicConfig(
     level=logging.INFO,
@@ -103,87 +104,14 @@ for i, (train_df, validation_df, test_df) in enumerate(data_sets):
 for i, (timerange_str, metrics) in enumerate(zip(validaiton_timerange_strs, metrics_list)):
     print(f"{i+1}, {timerange_str}, non_zero_accuracy: {metrics['non_zero_accuracy']:.2f} (out of {metrics['non_zero_predictions']})")
 
-# Combine all validation DataFrames
-if all_validation_dfs:
-    # Concatenate all validation DataFrames
-    combined_validation_df = pd.concat(all_validation_dfs)
-    
-    # Check if we need to deduplicate (will have the same index if overlapping)
-    if len(combined_validation_df) > combined_validation_df.index.nunique():
-        print(f"\nFound duplicate timestamps in validation sets, deduplicating...")
-        
-        # Group by index and take the prediction from the first model
-        # Sort by index and model number (ascending)
-        combined_validation_df = combined_validation_df.reset_index()
-        combined_validation_df = combined_validation_df.sort_values(
-            ['timestamp', 'symbol', 'model_num'], 
-            ascending=[True, True, True]
-        )
-        
-        # Drop duplicates, keeping the first occurrence (which has earliest model number)
-        combined_validation_df = combined_validation_df.drop_duplicates(subset=['timestamp', 'symbol'], keep='first')
-        
-        # Reset index
-        combined_validation_df = combined_validation_df.set_index(['timestamp', 'symbol'])
-    
-    print(f"Combined validation data shape: {combined_validation_df.shape}")
-    print(f"Unique timestamps: {combined_validation_df.index.get_level_values('timestamp').nunique()}")
-    print(f"Unique symbols: {combined_validation_df.index.get_level_values('symbol').nunique()}")
-    
-    # Optionally save the combined validation data
-    # combined_validation_df.to_csv('combined_validation_predictions.csv')
-
-
-def calculate_trade_returns(df, threshold=0.70):
-    """
-    Calculate trade returns based on predictions and actual values.
-    
-    Args:
-        df: DataFrame containing 'y_true' and 'y_pred' columns
-        threshold: Threshold for determining trade decisions (default: 0.80)
-        
-    Returns:
-        DataFrame with added 'trade_return' column
-    """
-    # Create a copy to avoid modifying the original
-    result_df = df.copy()
-    
-    # Convert predictions to discrete values using threshold
-    result_df['pred_discrete'] = 0
-    result_df.loc[result_df['pred'] > threshold, 'pred_discrete'] = 1
-    result_df.loc[result_df['pred'] < -threshold, 'pred_discrete'] = -1
-    
-    # Calculate trade returns:
-    # 1. For long positions (pred=1): return equals the actual value
-    # 2. For short positions (pred=-1): return equals the negative of actual value
-    # 3. For neutral positions (pred=0): return is 0 (no trade)
-    result_df['trade_return'] = 0.0
-    result_df['trade_return'] = np.where((result_df['pred_discrete'] == 1) & (result_df['y'] == 1), 1, result_df['trade_return'])
-    result_df['trade_return'] = np.where((result_df['pred_discrete'] == -1) & (result_df['y'] == -1), 1, result_df['trade_return'])
-    result_df['trade_return'] = np.where((result_df['pred_discrete'] != 0) & (result_df['y'] != 0) & (result_df['pred_discrete'] != result_df['y']), -1, result_df['trade_return'])
-    
-    # Calculate some statistics
-    avg_return = result_df[result_df['pred_discrete'] != 0]['trade_return'].mean()
-    total_trades = len(result_df[result_df['pred_discrete'] != 0])
-    win_rate = len(result_df[result_df['trade_return'] > 0]) / total_trades if total_trades > 0 else 0
-    loss_rate = len(result_df[result_df['trade_return'] < 0]) / total_trades if total_trades > 0 else 0
-    draw_rate = len(result_df[(result_df['pred_discrete'] != 0) & (result_df['y'] == 0)]) / total_trades if total_trades > 0 else 0
-    
-    print(f"\nTrade statistics (threshold={threshold}):")
-    print(f"Total trades: {total_trades}")
-    print(f"Average return per trade: {avg_return:.4f}")
-    print(f"Win rate: {win_rate:.2%}, loss: {loss_rate:.2%}, draw: {draw_rate:.2%}")
-    print(f"Total return: {result_df['trade_return'].sum():.4f}")
-    
-    return result_df
-
+combined_validation_df = ml_trading.machine_learning.util.combine_validation_dfs(all_validation_dfs)
 
 # Example usage:
 if 'combined_validation_df' in locals():
     # Calculate with different thresholds for comparison
-    trade_results_conservative = calculate_trade_returns(combined_validation_df, threshold=0.8)
-    trade_results = calculate_trade_returns(combined_validation_df)
-    trade_results_aggressive = calculate_trade_returns(combined_validation_df, threshold=0.5)
+    trade_results_conservative = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.8)
+    trade_results = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df)
+    trade_results_aggressive = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.5)
 #'''
 
 print('done')

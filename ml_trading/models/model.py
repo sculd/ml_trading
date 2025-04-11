@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import xgboost as xgb
 from typing import Tuple, Dict, Any
-import ml_trading.models.util
+import ml_trading.machine_learning.util
 
 
 def train_xgboost_model(
@@ -106,4 +106,4 @@ def train_xgboost_model(
     validation_y_df['pred'] = y_pred
     validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
 
-    return model, ml_trading.models.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df
+    return model, ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df
