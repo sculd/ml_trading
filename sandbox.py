@@ -75,6 +75,7 @@ data_sets = ml_trading.machine_learning.validation_data.create_split_moving_forw
 
 
 import ml_trading.models.model
+import ml_trading.models.deep_model
 
 metrics_list = []
 validaiton_timerange_strs = []
@@ -88,15 +89,25 @@ for i, (train_df, validation_df, test_df) in enumerate(data_sets):
     validaiton_timerange_strs.append(f'{validation_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {validation_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')
     #print(f'test: {len(test_df)}\n{test_df.head(1).index}\n{test_df.tail(1).index}')
 
+    '''
     model, metrics, validation_y_df = ml_trading.models.model.train_xgboost_model(
         #ml_data_df, 
         train_df=train_df,
         validation_df=validation_df,
         target_column='label_long_tp30_sl30_10m',
         prediction_threshold=0.70)
+    #'''
+
+    #'''
+    model, metrics, validation_y_df = ml_trading.models.deep_model.train_mlp_model(
+        #ml_data_df, 
+        train_df=train_df,
+        validation_df=validation_df,
+        target_column='label_long_tp30_sl30_10m',
+        prediction_threshold=0.50)
+    #'''
+
     metrics_list.append(metrics)
-    
-    # Add model number for tracking
     validation_y_df['model_num'] = i+1
     all_validation_dfs.append(validation_y_df)
 
