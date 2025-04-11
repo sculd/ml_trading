@@ -9,7 +9,6 @@ from typing import Tuple, Dict, List, Optional
 import ml_trading.machine_learning.util
 import ml_trading.models.util
 from tqdm.auto import tqdm
-import sys
 
 
 class MLPModel(nn.Module):
@@ -21,28 +20,35 @@ class MLPModel(nn.Module):
         input_dim: int, 
         hidden_layers: List[int] = [64, 32],
         output_dim: int = 1, 
-        dropout_rate: float = 0.2
+        dropout_rate: float = 0.2,
+        use_norm: bool = False
     ):
         """Initialize MLP model."""
         super(MLPModel, self).__init__()
         
-        # Define layers explicitly instead of using Sequential
-        self.input_linear = nn.Linear(input_dim, hidden_layers[0])
-        self.input_relu = nn.ReLU()
-        self.input_dropout = nn.Dropout(dropout_rate)
+        # Build model using Sequential
+        layers = []
         
-        # Create hidden layers
-        self.hidden_linears = nn.ModuleList()
-        self.hidden_relus = nn.ModuleList()
-        self.hidden_dropouts = nn.ModuleList()
+        # Input layer
+        layers.append(nn.Linear(input_dim, hidden_layers[0]))
+        if use_norm:
+            layers.append(nn.BatchNorm1d(hidden_layers[0]))
+        layers.append(nn.ReLU())
+        layers.append(nn.Dropout(dropout_rate))
         
-        for i in range(len(hidden_layers)-1):
-            self.hidden_linears.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
-            self.hidden_relus.append(nn.ReLU())
-            self.hidden_dropouts.append(nn.Dropout(dropout_rate))
+        # Hidden layers
+        for i in range(len(hidden_layers) - 1):
+            layers.append(nn.Linear(hidden_layers[i], hidden_layers[i + 1]))
+            if use_norm:
+                layers.append(nn.BatchNorm1d(hidden_layers[i + 1]))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(dropout_rate))
         
         # Output layer
-        self.output_linear = nn.Linear(hidden_layers[-1], output_dim)
+        layers.append(nn.Linear(hidden_layers[-1], output_dim))
+        
+        # Create sequential model
+        self.model = nn.Sequential(*layers)
     
     def forward(self, x):
         """Forward pass through the network."""
@@ -50,28 +56,15 @@ class MLPModel(nn.Module):
         if len(x.shape) == 1:
             x = x.unsqueeze(0)  # Add batch dimension
             
-        # Input layer
-        x = self.input_linear(x)
-        x = self.input_relu(x)
-        x = self.input_dropout(x)
-        
-        # Hidden layers
-        for i in range(len(self.hidden_linears)):
-            x = self.hidden_linears[i](x)
-            x = self.hidden_relus[i](x)
-            x = self.hidden_dropouts[i](x)
-        
-        # Output layer
-        x = self.output_linear(x)
-        
-        return x
+        return self.model(x)
 
 
 def _process_data(
     data_df: pd.DataFrame,
     target_column: str,
     scaler: Optional[StandardScaler] = None,
-    fit_scaler: bool = False
+    fit_scaler: bool = False,
+    use_scaler: bool = True
 ) -> Tuple[np.ndarray, np.ndarray, StandardScaler]:
     """Process data for MLP model."""
     # Copy the data to avoid modifying the original
@@ -94,14 +87,20 @@ def _process_data(
     X = data_df.drop(target_column, axis=1)
     y = data_df[target_column].values
     
-    # Scale features
-    if scaler is None:
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-    elif fit_scaler:
-        X_scaled = scaler.fit_transform(X)
+    # Scale features if requested
+    if use_scaler:
+        if scaler is None:
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+        elif fit_scaler:
+            X_scaled = scaler.fit_transform(X)
+        else:
+            X_scaled = scaler.transform(X)
     else:
-        X_scaled = scaler.transform(X)
+        # Skip scaling, but still return a dummy scaler for API consistency
+        X_scaled = X.values
+        if scaler is None:
+            scaler = StandardScaler()
     
     # Ensure output is float32 for PyTorch
     X_scaled = X_scaled.astype(np.float32)
@@ -124,7 +123,9 @@ def train_mlp_model(
     save_path: str = None,
     optimizer_type: str = 'sgd',
     gradient_clip_norm: float = 1.0,
-    verbose: bool = True
+    verbose: bool = True,
+    use_scaler: bool = True,
+    use_norm: bool = False
 ) -> Tuple[MLPModel, Dict[str, float], pd.DataFrame]:
     """Train an MLP model on the provided data."""
     # Use device from util module
@@ -132,8 +133,8 @@ def train_mlp_model(
     print(f"Using device: {device}")
     
     # Process data
-    X_train, y_train, scaler = _process_data(train_df, target_column, fit_scaler=True)
-    X_val, y_test, _ = _process_data(validation_df, target_column, scaler=scaler)
+    X_train, y_train, scaler = _process_data(train_df, target_column, fit_scaler=True, use_scaler=use_scaler)
+    X_val, y_test, _ = _process_data(validation_df, target_column, scaler=scaler, use_scaler=use_scaler)
     
     # Print label distribution
     print(f"\nTotal validation samples: {len(y_test)}")
@@ -155,7 +156,8 @@ def train_mlp_model(
     val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=0)
     
     # Create model
-    model = MLPModel(input_dim=X_train.shape[1], hidden_layers=hidden_layers, dropout_rate=dropout_rate)
+    model = MLPModel(input_dim=X_train.shape[1], hidden_layers=hidden_layers, 
+                    dropout_rate=dropout_rate, use_norm=use_norm)
     model = model.to(device)
     
     # Define loss and optimizer
