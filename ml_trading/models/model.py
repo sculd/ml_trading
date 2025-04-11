@@ -74,10 +74,7 @@ def train_xgboost_model(
     down_samples = np.sum(y_test < 0)
     neutral_samples = np.sum(y_test == 0)
     
-    print(f"Total samples: {total_samples}")
-    print(f"Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%)")
-    print(f"Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%)")
-    print(f"Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
+    print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
     
     # Default XGBoost parameters if none provided
     if xgb_params is None:
@@ -103,4 +100,10 @@ def train_xgboost_model(
     # Make predictions
     y_pred = model.predict(X_test)
 
-    return model, ml_trading.models.util.get_metrics(y_test, y_pred, prediction_threshold)
+    validation_y_df = pd.DataFrame(index=X_test.index)
+    validation_y_df['symbol'] = validation_df['symbol']
+    validation_y_df['y'] = y_test
+    validation_y_df['pred'] = y_pred
+    validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
+
+    return model, ml_trading.models.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df

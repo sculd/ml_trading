@@ -1,7 +1,81 @@
 import pandas as pd
 import datetime
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Dict, Any
 from market_data.machine_learning.cache_ml_data import load_cached_ml_data
+import numpy as np
+from market_data.ingest.bq.common import DATASET_MODE, EXPORT_MODE, AGGREGATION_MODE
+import market_data.util.time
+
+def _purge(
+    ml_data: pd.DataFrame,
+    purge_period: datetime.timedelta = datetime.timedelta(days=0),
+) -> pd.DataFrame:
+    """
+    Remove data points that are within purge_period of each other.
+    
+    This helps reduce temporal dependency between consecutive data points.
+
+    Args:
+        ml_data: DataFrame with time index
+        purge_period: Timedelta for the purge period
+
+    Returns:
+        A purged DataFrame with selected data points.
+    """
+    # If no purging needed, return original data
+    if purge_period == datetime.timedelta(0):
+        return ml_data
+    
+    # Ensure the data is sorted by timestamp
+    ml_data = ml_data.sort_index()
+    
+    purged_data = []
+    n_purged = 0
+    
+    # Process each symbol separately to maintain symbol-specific patterns
+    for symbol, symbol_data in ml_data.groupby('symbol'):
+        symbol_data = symbol_data.sort_index()
+        if len(symbol_data) == 0:
+            continue
+            
+        # Initialize with the first data point
+        selected_rows = [0]  # Start with the first row index (within the symbol group)
+        
+        # Get timestamp - handle either MultiIndex or regular TimeIndex
+        if isinstance(symbol_data.index, pd.MultiIndex):
+            last_selected_time = symbol_data.index[0][0]  # Get timestamp from MultiIndex level 0
+        else:
+            last_selected_time = symbol_data.index[0]  # Regular index
+        
+        # Iterate through remaining data points
+        for i in range(1, len(symbol_data)):
+            # Get current timestamp - handle either MultiIndex or regular TimeIndex
+            if isinstance(symbol_data.index, pd.MultiIndex):
+                current_time = symbol_data.index[i][0]  # Get timestamp from MultiIndex level 0
+            else:
+                current_time = symbol_data.index[i]  # Regular index
+                
+            time_diff = current_time - last_selected_time
+            
+            if time_diff >= purge_period:
+                selected_rows.append(i)
+                last_selected_time = current_time
+            else:
+                n_purged += 1
+        
+        # Select only the rows we want to keep
+        purged_data.append(symbol_data.iloc[selected_rows])
+    
+    print(f"Purged {n_purged} data points")
+    
+    # Combine all purged data
+    if not purged_data:
+        return pd.DataFrame(columns=ml_data.columns)
+        
+    purged_df = pd.concat(purged_data)
+    purged_df = purged_df.sort_index()
+    return purged_df
+
 
 def create_train_validation_test_splits(
     dataset_mode,
@@ -59,33 +133,7 @@ def create_train_validation_test_splits(
         resample_params=resample_params
     )
 
-    # Ensure the data is sorted by timestamp
-    ml_data = ml_data.sort_index()
-
-    # Preprocess: Purge data points within each symbol
-    if purge_period > datetime.timedelta(0):
-        purged_data = []
-        for symbol, symbol_data in ml_data.groupby('symbol'):
-            symbol_data = symbol_data.sort_index()
-            if len(symbol_data) == 0:
-                continue
-                
-            # Initialize with the first data point
-            selected_indices = [symbol_data.index[0]]
-            last_selected_time = symbol_data.index[0]
-            
-            # Iterate through remaining data points
-            for idx in symbol_data.index[1:]:
-                if idx - last_selected_time >= purge_period:
-                    selected_indices.append(idx)
-                    last_selected_time = idx
-            
-            # Keep only the selected data points
-            purged_data.append(symbol_data.loc[selected_indices])
-        
-        # Combine all purged data
-        ml_data = pd.concat(purged_data)
-        ml_data = ml_data.sort_index()
+    ml_data = _purge(ml_data, purge_period)
 
     data_sets = []
 
@@ -119,3 +167,168 @@ def create_train_validation_test_splits(
         window_end += step_size
 
     return data_sets
+
+
+def create_split_moving_forward(
+    dataset_mode: DATASET_MODE,
+    export_mode: EXPORT_MODE,
+    aggregation_mode: AGGREGATION_MODE,
+    time_range: market_data.util.time.TimeRange,
+    feature_params: Dict[str, Any] = None,
+    target_params: Dict[str, Any] = None,
+    resample_params: Dict[str, Any] = None,
+    purge_period: datetime.timedelta = datetime.timedelta(days=0),
+    embargo_period: datetime.timedelta = datetime.timedelta(days=1),
+    window_type: str = 'fixed',  # 'fixed' or 'expanding'
+    initial_training_fixed_window_size: datetime.timedelta = datetime.timedelta(days=10),
+    step_event_size: int = 1000,
+    validation_fixed_event_size: int = 300,
+    test_fixed_event_size: int = 150
+) -> List[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
+    """
+    Create moving window splits with fixed training size and fixed event sizes for validation and test sets.
+    
+    The initial training window size is determined by initial_training_fixed_window_size.
+    After that, both the start and end of the training window move forward by step_event_size.
+    Validation and test sets have fixed sizes specified by validation_fixed_event_size and test_fixed_event_size.
+    
+    Args:
+        dataset_mode: Dataset mode (e.g., OKX)
+        export_mode: Export mode (e.g., BY_MINUTE)
+        aggregation_mode: Aggregation mode (e.g., TAKE_LASTEST)
+        time_range: Time range for the data
+        feature_params: Parameters for feature generation
+        target_params: Parameters for target generation
+        resample_params: Parameters for resampling
+        purge_period: Period to purge from the end of each split
+        embargo_period: Period to embargo between splits
+        window_type: Type of window ('fixed' or 'expanding')
+        initial_training_fixed_window_size: Initial fixed time size of the training window
+        step_event_size: Number of events to move forward in each step
+        validation_fixed_event_size: Fixed number of events for the validation set
+        test_fixed_event_size: Fixed number of events for the test set
+        
+    Returns:
+        List of tuples containing (train_df, validation_df, test_df) for each split
+    """
+    # Validate parameters
+    if validation_fixed_event_size < 0:
+        raise ValueError("validation_fixed_event_size must be non-negative")
+    if test_fixed_event_size < 0:
+        raise ValueError("test_fixed_event_size must be non-negative")
+    
+    # Load the full dataset
+    ml_data = load_cached_ml_data(
+        dataset_mode=dataset_mode,
+        export_mode=export_mode,
+        aggregation_mode=aggregation_mode,
+        time_range=time_range,
+        feature_params=feature_params,
+        target_params=target_params,
+        resample_params=resample_params
+    )
+    ml_data = _purge(ml_data, purge_period)
+    
+    # Sort by timestamp to ensure chronological order
+    ml_data = ml_data.sort_index()
+    
+    # Initialize variables
+    splits = []
+    total_rows = len(ml_data)
+    
+    # Initialize for the first window (using fixed time window)
+    start_idx = 0
+    
+    # Get the timestamp - handle different index types
+    start_time = ml_data.index[start_idx]
+    # If MultiIndex, get the timestamp (usually first level)
+    if isinstance(start_time, tuple):
+        start_time = start_time[0]
+        
+    end_time = start_time + initial_training_fixed_window_size
+    
+    # Find the end index for the first training window
+    train_end_idx = start_idx
+    while train_end_idx < total_rows:
+        current_time = ml_data.index[train_end_idx]
+        # If MultiIndex, get the timestamp
+        if isinstance(current_time, tuple):
+            current_time = current_time[0]
+            
+        if current_time >= end_time:
+            break
+        train_end_idx += 1
+    
+    # Ensure we have at least step_event_size training samples for the first window
+    if train_end_idx - start_idx < step_event_size:
+        train_end_idx = start_idx + step_event_size
+    
+    # Now create the splits
+    while start_idx < total_rows and train_end_idx <= total_rows:
+        # Extract training data
+        train_df = ml_data.iloc[start_idx:train_end_idx]
+        
+        # Get the embargo point after training (move validation start by embargo period)
+        if train_end_idx < total_rows:
+            # Get the timestamp of the last training point
+            last_train_time = ml_data.index[train_end_idx-1]
+            # If MultiIndex, get the timestamp
+            if isinstance(last_train_time, tuple):
+                last_train_time = last_train_time[0]
+                
+            val_start_time = last_train_time + embargo_period
+            
+            # Find the index after the embargo period
+            val_start_idx = train_end_idx
+            while val_start_idx < total_rows:
+                current_time = ml_data.index[val_start_idx]
+                # If MultiIndex, get the timestamp
+                if isinstance(current_time, tuple):
+                    current_time = current_time[0]
+                    
+                if current_time >= val_start_time:
+                    break
+                val_start_idx += 1
+        else:
+            val_start_idx = train_end_idx
+        
+        # Extract validation data - use fixed size for validation
+        val_end_idx = min(val_start_idx + validation_fixed_event_size, total_rows)
+        validation_df = ml_data.iloc[val_start_idx:val_end_idx] if validation_fixed_event_size > 0 else pd.DataFrame()
+        
+        # Get the embargo point after validation (move test start by embargo period)
+        if val_end_idx < total_rows and not validation_df.empty:
+            # Get the timestamp of the last validation point
+            last_val_time = ml_data.index[val_end_idx-1]
+            # If MultiIndex, get the timestamp
+            if isinstance(last_val_time, tuple):
+                last_val_time = last_val_time[0]
+                
+            test_start_time = last_val_time + embargo_period
+            
+            # Find the index after the embargo period
+            test_start_idx = val_end_idx
+            while test_start_idx < total_rows:
+                current_time = ml_data.index[test_start_idx]
+                # If MultiIndex, get the timestamp
+                if isinstance(current_time, tuple):
+                    current_time = current_time[0]
+                    
+                if current_time >= test_start_time:
+                    break
+                test_start_idx += 1
+        else:
+            test_start_idx = val_end_idx
+        
+        # Extract test data - use fixed size for test
+        test_end_idx = min(test_start_idx + test_fixed_event_size, total_rows)
+        test_df = ml_data.iloc[test_start_idx:test_end_idx] if test_fixed_event_size > 0 else pd.DataFrame()
+        
+        # Add the split to the list
+        splits.append((train_df, validation_df, test_df))
+        
+        # Move to the next window - both start and end move by step_event_size
+        start_idx += step_event_size
+        train_end_idx += step_event_size
+    
+    return splits

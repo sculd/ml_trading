@@ -69,6 +69,7 @@ def get_metrics(y_test: np.ndarray, y_pred: np.ndarray, prediction_threshold: fl
         'mae': mean_absolute_error(y_test, y_pred),
         'r2': r2_score(y_test, y_pred),
         'accuracy': accuracy,
+        'non_zero_predictions': len(correct_prediction[non_zero_predictions]),
         'non_zero_accuracy': non_zero_accuracy,
         'positive_precision': np.sum((y_pred_discrete == 1) & (y_test > 0)) / np.sum(y_pred_discrete == 1),
         'positive_recall': np.sum((y_pred_discrete == 1) & (y_test > 0)) / np.sum(y_test > 0),
