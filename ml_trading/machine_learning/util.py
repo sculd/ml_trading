@@ -17,21 +17,21 @@ def get_metrics(y_test: np.ndarray, y_pred: np.ndarray, prediction_threshold: fl
         Dictionary of evaluation metrics
     """
     # Convert continuous predictions to discrete classes using threshold
-    y_pred_discrete = np.zeros_like(y_pred)
-    y_pred_discrete[y_pred > prediction_threshold] = 1
-    y_pred_discrete[y_pred < -prediction_threshold] = -1
+    y_pred_decision = np.zeros_like(y_pred)
+    y_pred_decision[y_pred > prediction_threshold] = 1
+    y_pred_decision[y_pred < -prediction_threshold] = -1
     
     # Calculate overall accuracy
-    correct_prediction = y_pred_discrete == y_test
+    correct_prediction = y_pred_decision == y_test
     accuracy = np.mean(correct_prediction)
     
     # Calculate non-zero prediction accuracy (when model makes a directional call)
-    non_zero_predictions = y_pred_discrete != 0
+    non_zero_predictions = y_pred_decision != 0
     non_zero_accuracy = np.mean(correct_prediction[non_zero_predictions]) if np.any(non_zero_predictions) else 0.0
     
-    total_positive = len(y_pred_discrete[y_test > 0])
-    total_neutral = len(y_pred_discrete[y_test == 0])
-    total_negative = len(y_pred_discrete[y_test < 0])
+    total_positive = len(y_pred_decision[y_test > 0])
+    total_neutral = len(y_pred_decision[y_test == 0])
+    total_negative = len(y_pred_decision[y_test < 0])
     
     def print_breakdown(mask, predictions, total):
         print(f"\nTotal {mask} labels: {total}")
@@ -42,15 +42,15 @@ def get_metrics(y_test: np.ndarray, y_pred: np.ndarray, prediction_threshold: fl
         print(f"Predicted as negative: {np.sum(predictions == -1)} ({np.sum(predictions == -1)/total*100:.2f}%)\n")
 
     print("\n=== Recall Breakdown (by actual label) ===")
-    print_breakdown('positive', y_pred_discrete[y_test > 0], total_positive)
-    print_breakdown('neutral', y_pred_discrete[y_test == 0], total_neutral)
-    print_breakdown('negative', y_pred_discrete[y_test < 0], total_negative)
+    print_breakdown('positive', y_pred_decision[y_test > 0], total_positive)
+    print_breakdown('neutral', y_pred_decision[y_test == 0], total_neutral)
+    print_breakdown('negative', y_pred_decision[y_test < 0], total_negative)
     
     # Print precision breakdown
     print("\n=== Precision Breakdown (by prediction) ===")
-    total_pred_positive = np.sum(y_pred_discrete == 1)
-    total_pred_neutral = np.sum(y_pred_discrete == 0)
-    total_pred_negative = np.sum(y_pred_discrete == -1)
+    total_pred_positive = np.sum(y_pred_decision > 0)
+    total_pred_neutral = np.sum(y_pred_decision == 0)
+    total_pred_negative = np.sum(y_pred_decision < 0)
     
     def print_precision_breakdown(pred_type, pred_mask, total):
         print(f"\nTotal {pred_type} predictions: {total}")
@@ -61,9 +61,9 @@ def get_metrics(y_test: np.ndarray, y_pred: np.ndarray, prediction_threshold: fl
         print(f"Actually neutral: {np.sum(actual_labels == 0)} ({np.sum(actual_labels == 0)/total*100:.2f}%)")
         print(f"Actually negative: {np.sum(actual_labels < 0)} ({np.sum(actual_labels < 0)/total*100:.2f}%)\n")
     
-    print_precision_breakdown('positive', y_pred_discrete == 1, total_pred_positive)
-    print_precision_breakdown('neutral', y_pred_discrete == 0, total_pred_neutral)
-    print_precision_breakdown('negative', y_pred_discrete == -1, total_pred_negative)
+    print_precision_breakdown('positive', y_pred_decision > 0, total_pred_positive)
+    print_precision_breakdown('neutral', y_pred_decision == 0, total_pred_neutral)
+    print_precision_breakdown('negative', y_pred_decision < 0, total_pred_negative)
     
     # Calculate class-specific metrics
     metrics = {
@@ -72,12 +72,12 @@ def get_metrics(y_test: np.ndarray, y_pred: np.ndarray, prediction_threshold: fl
         'accuracy': accuracy,
         'non_zero_predictions': len(correct_prediction[non_zero_predictions]),
         'non_zero_accuracy': non_zero_accuracy,
-        'positive_precision': np.sum((y_pred_discrete == 1) & (y_test > 0)) / np.sum(y_pred_discrete == 1),
-        'positive_recall': np.sum((y_pred_discrete == 1) & (y_test > 0)) / np.sum(y_test > 0),
-        'neutral_precision': np.sum((y_pred_discrete == 0) & (y_test == 0)) / np.sum(y_pred_discrete == 0),
-        'neutral_recall': np.sum((y_pred_discrete == 0) & (y_test == 0)) / np.sum(y_test == 0),
-        'negative_precision': np.sum((y_pred_discrete == -1) & (y_test < 0)) / np.sum(y_pred_discrete == -1),
-        'negative_recall': np.sum((y_pred_discrete == -1) & (y_test < 0)) / np.sum(y_test < 0),
+        'positive_precision': np.sum((y_pred_decision > 0) & (y_test > 0)) / np.sum(y_pred_decision > 0),
+        'positive_recall': np.sum((y_pred_decision > 0) & (y_test > 0)) / np.sum(y_test > 0),
+        'neutral_precision': np.sum((y_pred_decision == 0) & (y_test == 0)) / np.sum(y_pred_decision == 0),
+        'neutral_recall': np.sum((y_pred_decision == 0) & (y_test == 0)) / np.sum(y_test == 0),
+        'negative_precision': np.sum((y_pred_decision < 0) & (y_test < 0)) / np.sum(y_pred_decision < 0),
+        'negative_recall': np.sum((y_pred_decision < 0) & (y_test < 0)) / np.sum(y_test < 0),
     }
     
     # Print metrics
@@ -92,8 +92,8 @@ def calculate_trade_returns(result_df, threshold=0.70):
     Calculate trade returns based on predictions and actual values.
     
     Args:
-        df: DataFrame containing 'y_true' and 'y_pred' columns
-        threshold: Threshold for determining trade decisions (default: 0.80)
+        df: DataFrame containing 'y' and 'pred' columns
+        threshold: Threshold for determining trade decisions
         
     Returns:
         DataFrame with added 'trade_return' column
@@ -102,25 +102,25 @@ def calculate_trade_returns(result_df, threshold=0.70):
     result_df = result_df.copy()
     
     # Convert predictions to discrete values using threshold
-    result_df['pred_discrete'] = 0
-    result_df.loc[result_df['pred'] > threshold, 'pred_discrete'] = 1
-    result_df.loc[result_df['pred'] < -threshold, 'pred_discrete'] = -1
-    
+    result_df['pred_decision'] = 0.0
+    result_df.loc[result_df['pred'] > threshold, 'pred_decision'] = 1
+    result_df.loc[result_df['pred'] < -threshold, 'pred_decision'] = -1
+
     # Calculate trade returns:
     # 1. For long positions (pred=1): return equals the actual value
     # 2. For short positions (pred=-1): return equals the negative of actual value
     # 3. For neutral positions (pred=0): return is 0 (no trade)
     result_df['trade_return'] = 0.0
-    result_df['trade_return'] = np.where((result_df['pred_discrete'] == 1) & (result_df['y'] == 1), 1, result_df['trade_return'])
-    result_df['trade_return'] = np.where((result_df['pred_discrete'] == -1) & (result_df['y'] == -1), 1, result_df['trade_return'])
-    result_df['trade_return'] = np.where((result_df['pred_discrete'] != 0) & (result_df['y'] != 0) & (result_df['pred_discrete'] != result_df['y']), -1, result_df['trade_return'])
+    result_df['trade_return'] = np.where((result_df['pred_decision'] > 0) & (result_df['y'] == 1), abs(result_df['pred_decision']), result_df['trade_return'])
+    result_df['trade_return'] = np.where((result_df['pred_decision'] < 0) & (result_df['y'] == -1), abs(result_df['pred_decision']), result_df['trade_return'])
+    result_df['trade_return'] = np.where((result_df['pred_decision'] != 0) & (result_df['y'] != 0) & (result_df['pred_decision'] * result_df['y'] < 0), -np.abs(result_df['pred_decision']), result_df['trade_return'])
     
     # Calculate some statistics
-    avg_return = result_df[result_df['pred_discrete'] != 0]['trade_return'].mean()
-    total_trades = len(result_df[result_df['pred_discrete'] != 0])
+    avg_return = result_df[result_df['pred_decision'] != 0]['trade_return'].mean()
+    total_trades = len(result_df[result_df['pred_decision'] != 0])
     win_rate = len(result_df[result_df['trade_return'] > 0]) / total_trades if total_trades > 0 else 0
     loss_rate = len(result_df[result_df['trade_return'] < 0]) / total_trades if total_trades > 0 else 0
-    draw_rate = len(result_df[(result_df['pred_discrete'] != 0) & (result_df['y'] == 0)]) / total_trades if total_trades > 0 else 0
+    draw_rate = len(result_df[(result_df['pred_decision'] != 0) & (result_df['y'] == 0)]) / total_trades if total_trades > 0 else 0
     
     print(f"\nTrade statistics (threshold={threshold}):")
     print(f"Total trades: {total_trades}")
