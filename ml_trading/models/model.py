@@ -5,7 +5,7 @@ from sklearn.metrics import mean_absolute_error, r2_score
 import xgboost as xgb
 from typing import Tuple, Dict, Any
 import ml_trading.machine_learning.util
-
+from ml_trading.models.util import into_X_y
 
 def train_xgboost_model(
     #data_df: pd.DataFrame,
@@ -15,7 +15,7 @@ def train_xgboost_model(
     test_size: float = 0.2,
     random_state: int = 42,
     xgb_params: Dict[str, Any] = None,
-    prediction_threshold: float = 0.1
+    prediction_threshold: float = 0.5
 ) -> Tuple[xgb.XGBRegressor, Dict[str, float]]:
     """
     Train an XGBoost model on the provided data.
@@ -35,27 +35,8 @@ def train_xgboost_model(
     """
     # Drop the symbol column
 
-    def process_data(data_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
-        data_df = data_df.drop('symbol', axis=1)
-        
-        # Drop all label_ columns except the target column to prevent look-ahead bias
-        label_columns = [col for col in data_df.columns if col.startswith('label_') and col != target_column]
-        data_df = data_df.drop(label_columns, axis=1)
-        for col in ["open", "high", "low", "close", "volume"]:
-            assert col not in data_df.columns    
-
-        # Handle missing values
-        data_df = data_df.ffill().bfill()
-        
-        # Split features and target
-        X = data_df.drop(target_column, axis=1)
-        y = data_df[target_column]
-        #y[y == -1] = 0
-
-        return X, y
-
-    X_train, y_train = process_data(train_df)
-    X_test, y_test = process_data(validation_df)
+    X_train, y_train = into_X_y(train_df, target_column)
+    X_test, y_test = into_X_y(validation_df, target_column)
     
     # Split into train and test sets
     '''
@@ -99,7 +80,7 @@ def train_xgboost_model(
     # Make predictions
     y_pred = model.predict(X_test)
 
-    validation_y_df = pd.DataFrame(index=X_test.index)
+    validation_y_df = pd.DataFrame(index=validation_df.index)
     validation_y_df['symbol'] = validation_df['symbol']
     validation_y_df['y'] = y_test
     validation_y_df['pred'] = y_pred

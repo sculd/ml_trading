@@ -130,7 +130,22 @@ def calculate_trade_returns(result_df, threshold=0.70):
     
     return result_df
 
+
 def combine_validation_dfs(all_validation_dfs):
+    """
+    Combine multiple validation DataFrames into a single DataFrame.
+    
+    Args:
+        all_validation_dfs: List of validation DataFrames
+        
+    Returns:
+        Combined validation DataFrame. timestamp and symbol are the index.
+        The DataFrame will have the following columns:
+        - model_num: model number of the validation data
+        - pred: prediction of the validation data
+        - y: actual value of the validation data
+    """
+    
     # Combine all validation DataFrames
     if not all_validation_dfs:
         return pd.DataFrame()

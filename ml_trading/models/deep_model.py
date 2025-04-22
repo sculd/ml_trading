@@ -10,6 +10,7 @@ import ml_trading.machine_learning.util
 import ml_trading.models.util
 from tqdm.auto import tqdm
 
+_device = ml_trading.models.util.device
 
 class MLPModel(nn.Module):
     """
@@ -57,6 +58,20 @@ class MLPModel(nn.Module):
             x = x.unsqueeze(0)  # Add batch dimension
             
         return self.model(x)
+
+    def predict_batch(self, X):
+        # Make predictions
+        self.eval()
+        with torch.no_grad():
+            # Always use batch prediction to avoid memory issues
+            preds = []
+            batch_size = 32
+            for i in range(0, len(X), batch_size):
+                batch = X[i:i+batch_size].to(_device)
+                batch_preds = self.forward(batch).cpu().numpy()
+                preds.append(batch_preds)
+            y_pred = np.concatenate(preds).flatten()
+        return y_pred
 
 
 def _process_data(
@@ -128,9 +143,8 @@ def train_mlp_model(
     use_norm: bool = False
 ) -> Tuple[MLPModel, Dict[str, float], pd.DataFrame]:
     """Train an MLP model on the provided data."""
-    # Use device from util module
-    device = ml_trading.models.util.device
-    print(f"Using device: {device}")
+    # Use _device from util module
+    print(f"Using _device: {_device}")
     
     # Process data
     X_train, y_train, scaler = _process_data(train_df, target_column, fit_scaler=True, use_scaler=use_scaler)
@@ -158,7 +172,7 @@ def train_mlp_model(
     # Create model
     model = MLPModel(input_dim=X_train.shape[1], hidden_layers=hidden_layers, 
                     dropout_rate=dropout_rate, use_norm=use_norm)
-    model = model.to(device)
+    model = model.to(_device)
     
     # Define loss and optimizer
     criterion = nn.L1Loss()
@@ -184,7 +198,7 @@ def train_mlp_model(
         train_loss = 0.0
         
         for inputs, targets in train_loader:
-            inputs, targets = inputs.to(device), targets.to(device)
+            inputs, targets = inputs.to(_device), targets.to(_device)
             
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -206,7 +220,7 @@ def train_mlp_model(
         
         with torch.no_grad():
             for inputs, targets in val_loader:
-                inputs, targets = inputs.to(device), targets.to(device)
+                inputs, targets = inputs.to(_device), targets.to(_device)
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
                 val_loss += loss.item() * inputs.size(0)
@@ -251,7 +265,7 @@ def train_mlp_model(
         preds = []
         batch_size = 32
         for i in range(0, len(X_val_tensor), batch_size):
-            batch = X_val_tensor[i:i+batch_size].to(device)
+            batch = X_val_tensor[i:i+batch_size].to(_device)
             batch_preds = model(batch).cpu().numpy()
             preds.append(batch_preds)
         y_pred = np.concatenate(preds).flatten()

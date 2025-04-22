@@ -2,6 +2,8 @@ import pandas as pd
 import datetime
 from typing import Tuple, Optional, List, Dict, Any
 from market_data.machine_learning.cache_ml_data import load_cached_ml_data
+from market_data.feature.impl.common import SequentialFeatureParam
+
 import numpy as np
 from market_data.ingest.bq.common import DATASET_MODE, EXPORT_MODE, AGGREGATION_MODE
 import market_data.util.time
@@ -85,6 +87,7 @@ def create_train_validation_test_splits(
     feature_params=None,
     target_params=None,
     resample_params=None,
+    seq_params: SequentialFeatureParam = None,
     purge_period: datetime.timedelta = datetime.timedelta(days=0),
     embargo_period: datetime.timedelta = datetime.timedelta(days=1),
     window_type: str = 'fixed',  # 'fixed' or 'expanding'
@@ -130,7 +133,8 @@ def create_train_validation_test_splits(
         time_range=time_range,
         feature_params=feature_params,
         target_params=target_params,
-        resample_params=resample_params
+        resample_params=resample_params,
+        seq_params=seq_params,
     )
 
     ml_data = _purge(ml_data, purge_period)
@@ -139,10 +143,7 @@ def create_train_validation_test_splits(
 
     # Define the initial window
     window_start = ml_data.index[0]
-    if window_type == 'fixed' and fixed_window_size:
-        window_end = window_start + fixed_window_size
-    else:
-        window_end = window_start
+    window_end = window_start + fixed_window_size
 
     while window_end < ml_data.index[-1]:
         # Get the data up to window_end
@@ -174,9 +175,9 @@ def create_split_moving_forward(
     export_mode: EXPORT_MODE,
     aggregation_mode: AGGREGATION_MODE,
     time_range: market_data.util.time.TimeRange,
-    feature_params: Dict[str, Any] = None,
     target_params: Dict[str, Any] = None,
     resample_params: Dict[str, Any] = None,
+    seq_params: SequentialFeatureParam = None,
     purge_period: datetime.timedelta = datetime.timedelta(days=0),
     embargo_period: datetime.timedelta = datetime.timedelta(days=1),
     window_type: str = 'fixed',  # 'fixed' or 'expanding'
@@ -223,9 +224,9 @@ def create_split_moving_forward(
         export_mode=export_mode,
         aggregation_mode=aggregation_mode,
         time_range=time_range,
-        feature_params=feature_params,
         target_params=target_params,
-        resample_params=resample_params
+        resample_params=resample_params,
+        seq_params=seq_params,
     )
     ml_data = _purge(ml_data, purge_period)
     
@@ -328,7 +329,9 @@ def create_split_moving_forward(
         splits.append((train_df, validation_df, test_df))
         
         # Move to the next window - both start and end move by step_event_size
-        start_idx += step_event_size
+        if window_type == 'fixed':
+            start_idx += step_event_size
+
         train_end_idx += step_event_size
     
     return splits
