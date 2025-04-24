@@ -35,8 +35,8 @@ def train_xgboost_model(
     """
     # Drop the symbol column
 
-    X_train, y_train = into_X_y(train_df, target_column)
-    X_test, y_test = into_X_y(validation_df, target_column)
+    X_train, y_train, _ = into_X_y(train_df, target_column, use_scaler=False)
+    X_test, y_test, _ = into_X_y(validation_df, target_column, use_scaler=False)
     
     # Split into train and test sets
     '''

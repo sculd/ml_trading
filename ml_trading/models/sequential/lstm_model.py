@@ -75,7 +75,6 @@ def train_lstm_model(
     train_df: pd.DataFrame,
     validation_df: pd.DataFrame,
     target_column: str,
-    sequence_window: int = 10,
     hidden_dim: int = 128,
     num_layers: int = 2,
     learning_rate: float = 0.001,
@@ -85,7 +84,7 @@ def train_lstm_model(
     early_stopping_patience: int = 10,
     bidirectional: bool = False,
     use_scaler: bool = True,
-    optimizer_type: str = 'adam'
+    optimizer_type: str = 'sgd'
 ) -> Dict:
     """Train an LSTM model on sequential data.
     
@@ -93,7 +92,6 @@ def train_lstm_model(
         train_df: Training DataFrame
         validation_df: Validation DataFrame
         target_column: Name of the target column
-        sequence_window: Length of sequence window for each sample
         hidden_dim: Number of hidden units in LSTM
         num_layers: Number of LSTM layers
         learning_rate: Learning rate for optimizer
@@ -117,18 +115,23 @@ def train_lstm_model(
     torch.set_num_threads(1)
     
     # Process data
-    fit_scaler = use_scaler
     X_train, y_train, scaler = into_X_y(
-        train_df, target_column, sequence_window, fit_scaler=fit_scaler
+        train_df, target_column, use_scaler=use_scaler
     )
     
     X_val, y_val, _ = into_X_y(
-        validation_df, target_column, sequence_window, scaler=scaler, fit_scaler=False
+        validation_df, target_column, scaler=scaler, use_scaler=False
     )
     
+    # Convert numpy arrays to PyTorch tensors
+    X_train_tensor = torch.FloatTensor(X_train)
+    y_train_tensor = torch.FloatTensor(y_train)
+    X_val_tensor = torch.FloatTensor(X_val)
+    y_val_tensor = torch.FloatTensor(y_val)
+
     # Create DataLoaders
-    train_dataset = TensorDataset(X_train, y_train)
-    val_dataset = TensorDataset(X_val, y_val)
+    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)    
+    val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
     
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size)
@@ -159,6 +162,7 @@ def train_lstm_model(
     epochs_no_improve = 0
     history = {'train_loss': [], 'val_loss': []}
     
+    best_model = {}
     for epoch in range(num_epochs):
         # Training
         model.train()
@@ -203,6 +207,7 @@ def train_lstm_model(
         if epoch % 10 == 0:
             logger.info(f"Epoch {epoch}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
         
+        recent_model = model.state_dict().copy()
         # Early stopping
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -215,7 +220,10 @@ def train_lstm_model(
                 break
     
     # Load best model
-    model.load_state_dict(best_model)
+    if len(best_model) > 0:
+        model.load_state_dict(best_model)
+    else:
+        model.load_state_dict(recent_model)
     
     validation_y_df = pd.DataFrame(index=validation_df.index)
     validation_y_df['symbol'] = validation_df['symbol']

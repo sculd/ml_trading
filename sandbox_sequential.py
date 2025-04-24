@@ -83,6 +83,7 @@ data_sets = ml_trading.machine_learning.validation_data.create_split_moving_forw
 
 
 import ml_trading.models.sequential.hmm_model
+import ml_trading.models.sequential.lstm_model
 
 metrics_list = []
 validaiton_timerange_strs = []
@@ -98,35 +99,22 @@ for i, (train_df, validation_df, test_df) in enumerate(data_sets):
 
     target_column='label_long_tp30_sl30_10m'
     #'''
-    model, metrics, validation_y_df = ml_trading.models.sequential.hmm_model.train_hmm_model(
+    result = ml_trading.models.sequential.lstm_model.train_lstm_model(
         #ml_data_df, 
         train_df=train_df,
         validation_df=validation_df,
-        target_column=target_column,
-        prediction_threshold=0.70)
+        target_column=target_column)
     #'''
 
-
-    '''
-
-    def train_hmm_model(
-        train_df: pd.DataFrame,
-        validation_df: pd.DataFrame,
-        target_column: str,
-        n_components: int = 6,
-        n_iter: int = 100,
-        covariance_type: str = 'diag',
-        use_scaler: bool = True,
-        random_state: int = 42    
-    '''
-
-    metrics_list.append(metrics)
+    metrics_list.append(result['metrics'] if 'metrics' in result else {})
+    validation_y_df = result['validation_y_df']
     validation_y_df['model_num'] = i+1
     all_validation_dfs.append(validation_y_df)
 
 # Print metrics summary
 for i, (timerange_str, metrics) in enumerate(zip(validaiton_timerange_strs, metrics_list)):
-    print(f"{i+1}, {timerange_str}, non_zero_accuracy: {metrics['non_zero_accuracy']:.2f} (out of {metrics['non_zero_predictions']})")
+    #print(f"{i+1}, {timerange_str}, non_zero_accuracy: {metrics['non_zero_accuracy']:.2f} (out of {metrics['non_zero_predictions']})")
+    print(f"{i+1}, {timerange_str}")
 
 combined_validation_df = ml_trading.machine_learning.util.combine_validation_dfs(all_validation_dfs)
 

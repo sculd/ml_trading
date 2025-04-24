@@ -136,7 +136,7 @@ def train_mlp_model(
     early_stopping_patience: int = 10,
     prediction_threshold: float = 0.1,
     save_path: str = None,
-    optimizer_type: str = 'sgd',
+    optimizer_type: str = 'adam',
     gradient_clip_norm: float = 1.0,
     verbose: bool = True,
     use_scaler: bool = True,

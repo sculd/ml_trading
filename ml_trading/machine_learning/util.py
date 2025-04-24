@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
 from typing import Dict, Any
 
 
@@ -68,6 +68,7 @@ def get_metrics(y_test: np.ndarray, y_pred: np.ndarray, prediction_threshold: fl
     # Calculate class-specific metrics
     metrics = {
         'mae': mean_absolute_error(y_test, y_pred),
+        'mse': mean_squared_error(y_test, y_pred),
         'r2': r2_score(y_test, y_pred),
         'accuracy': accuracy,
         'non_zero_predictions': len(correct_prediction[non_zero_predictions]),
