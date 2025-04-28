@@ -3,7 +3,7 @@ import pandas as pd, numpy as np
 import websocket, ssl
 import ml_trading.live_trading.util.symbols_okx
 from collections import defaultdict, deque
-import ml_trading.streaming.candle_processor
+import ml_trading.streaming.candle_processor.candle_processor_base
 import pytz
 from threading import Thread
 

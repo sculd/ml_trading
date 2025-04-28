@@ -52,6 +52,30 @@ class LSTMModel(nn.Module):
         
         # Fully connected output layer
         self.fc = nn.Linear(hidden_dim * self.directions, output_dim)
+        
+        # Initialize weights
+        self.init_weights()
+    
+    def init_weights(self):
+        """Initialize the weights using a robust approach to prevent NaN issues.
+        
+        Uses Xavier uniform for input weights, orthogonal for recurrent weights,
+        and zeros for biases.
+        """
+        for name, param in self.lstm.named_parameters():
+            if 'weight_ih' in name:
+                nn.init.xavier_uniform_(param.data)
+            elif 'weight_hh' in name:
+                nn.init.orthogonal_(param.data)
+            elif 'bias' in name:
+                param.data.fill_(0)
+        
+        # Initialize linear layer
+        nn.init.xavier_uniform_(self.fc.weight.data)
+        if self.fc.bias is not None:
+            self.fc.bias.data.fill_(0)
+        
+        return self
     
     def forward(self, x):
         """Forward pass through the network."""
@@ -77,14 +101,15 @@ def train_lstm_model(
     target_column: str,
     hidden_dim: int = 128,
     num_layers: int = 2,
-    learning_rate: float = 0.001,
+    learning_rate: float = 0.0001,
     batch_size: int = 64,
     num_epochs: int = 100,
     dropout: float = 0.2,
     early_stopping_patience: int = 10,
     bidirectional: bool = False,
     use_scaler: bool = True,
-    optimizer_type: str = 'sgd'
+    optimizer_type: str = 'adam',
+    grad_clip_norm: float = 0.5  # Reduced from 1.0 to 0.5 for stability
 ) -> Dict:
     """Train an LSTM model on sequential data.
     
@@ -102,6 +127,7 @@ def train_lstm_model(
         bidirectional: Whether to use bidirectional LSTM
         use_scaler: Whether to scale the features
         optimizer_type: Optimizer type ('adam' or 'sgd')
+        grad_clip_norm: Maximum norm for gradient clipping
         
     Returns:
         Dict containing trained model, scaler, and training history
@@ -161,12 +187,14 @@ def train_lstm_model(
     best_val_loss = float('inf')
     epochs_no_improve = 0
     history = {'train_loss': [], 'val_loss': []}
+    nan_count = 0
     
     best_model = {}
     for epoch in range(num_epochs):
         # Training
         model.train()
         train_loss = 0.0
+        batch_count = 0
         
         for batch_X, batch_y in train_loader:
             batch_X, batch_y = batch_X.to(device), batch_y.to(device)
@@ -174,38 +202,95 @@ def train_lstm_model(
             # Forward pass
             optimizer.zero_grad()
             outputs = model(batch_X)
+            
+            # If we get here, we have valid outputs
             loss = criterion(outputs, batch_y)
+            
+            # Skip batch if loss is NaN
+            if torch.isnan(loss).any():
+                logger.warning(f"NaN detected in loss at epoch {epoch}, batch {batch_count}")
+                nan_count += 1
+                continue
             
             # Backward pass and optimize
             loss.backward()
-            # Clip gradients to prevent explosion
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            # Check for NaNs in gradients
+            has_nan_grad = False
+            for p in model.parameters():
+                if p.grad is not None and torch.isnan(p.grad).any():
+                    has_nan_grad = True
+                    break
+            
+            if has_nan_grad:
+                logger.warning(f"NaN detected in gradients at epoch {epoch}, batch {batch_count}")
+                optimizer.zero_grad()  # Clear the bad gradients
+                nan_count += 1
+                continue
+            
+            # Clip gradients to prevent explosion (use lower value)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_norm)
+            
+            # Debug gradient info
+            if (epoch == 0 or epoch % 20 == 0) and batch_count % 10 == 0:
+                grad_norm = 0.0
+                for p in model.parameters():
+                    if p.grad is not None:
+                        param_grad_norm = p.grad.data.norm(2).item()
+                        if param_grad_norm > 0:  # Avoid NaN in log
+                            grad_norm += param_grad_norm ** 2
+                grad_norm = grad_norm ** 0.5 if grad_norm > 0 else 0
+                logger.info(f"Epoch {epoch}, Batch {batch_count}, Gradient L2 norm: {grad_norm:.4f}")
+            
             optimizer.step()
             
             train_loss += loss.item()
+            batch_count += 1
         
-        train_loss /= len(train_loader)
+        # Skip epoch if no valid batches were processed
+        if batch_count == 0:
+            logger.warning(f"Skipping epoch {epoch} - no valid batches")
+            continue
+            
+        train_loss /= max(1, batch_count)
         history['train_loss'].append(train_loss)
         
         # Validation
         model.eval()
         val_loss = 0.0
         val_predictions = []
+        val_batch_count = 0
     
         with torch.no_grad():
             for batch_X, batch_y in val_loader:
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
                 outputs = model(batch_X)
+                
+                # Skip batches with NaN outputs during validation
+                if torch.isnan(outputs).any():
+                    continue
+                    
                 loss = criterion(outputs, batch_y)
+                
+                # Skip batches with NaN loss during validation
+                if torch.isnan(loss).any():
+                    continue
+                    
                 val_loss += loss.item()
                 val_predictions.append(outputs.cpu().numpy())
+                val_batch_count += 1
         
-        val_loss /= len(val_loader)
+        # Skip epoch if no valid validation batches
+        if val_batch_count == 0:
+            logger.warning(f"Skipping validation for epoch {epoch} - no valid batches")
+            val_loss = float('inf')
+        else:
+            val_loss /= val_batch_count
+            
         history['val_loss'].append(val_loss)
         
         # Print progress
-        if epoch % 10 == 0:
-            logger.info(f"Epoch {epoch}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+        logger.info(f"Epoch {epoch}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, NaN count: {nan_count}")
         
         recent_model = model.state_dict().copy()
         # Early stopping
@@ -213,6 +298,8 @@ def train_lstm_model(
             best_val_loss = val_loss
             epochs_no_improve = 0
             best_model = model.state_dict().copy()
+            # Reset NaN count when we improve
+            nan_count = 0
         else:
             epochs_no_improve += 1
             if epochs_no_improve >= early_stopping_patience:

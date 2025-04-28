@@ -7,7 +7,7 @@ import ml_trading.live_trading.util.symbols_binance
 from binance import ThreadedWebsocketManager
 
 from collections import defaultdict, deque
-import ml_trading.streaming.candle_processor
+import ml_trading.streaming.candle_processor.candle_processor_base
 
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(os.getcwd(), 'credential.json')

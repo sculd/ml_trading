@@ -1,7 +1,7 @@
 import pandas as pd, numpy as np
 import datetime, time
 from collections import defaultdict, deque
-import ml_trading.streaming.candle_processor
+import ml_trading.streaming.candle_processor.candle_processor_base
 import logging
 
 
@@ -13,7 +13,7 @@ class BacktestCsvPriceCache:
         self.iterrows = df_prices_history.iterrows()
         self.history_read_i = 0
 
-        self.candle_cache = ml_trading.streaming.candle_processor.CandleProcessorBase(windows_minutes=windows_minutes)
+        self.candle_cache = ml_trading.streaming.candle_processor.candle_processor_base.CandleProcessorBase(windows_minutes=windows_minutes)
 
         logging.info(f'csv price cache loaded {csv_filename}')
 

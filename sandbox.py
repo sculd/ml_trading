@@ -34,6 +34,7 @@ if not _PROJECT_ID:
 
 import market_data.util
 import market_data.util.time
+from market_data.feature.impl.common import SequentialFeatureParam
 
 time_range = market_data.util.time.TimeRange(
     date_str_from='2024-01-01', date_str_to='2025-04-01',
@@ -58,7 +59,7 @@ data_sets = ml_trading.machine_learning.validation_data.create_train_validation_
     time_range=time_range,
     fixed_window_size = datetime.timedelta(days=150),
     step_size = datetime.timedelta(days=30),
-    purge_period = datetime.timedelta(minutes=30),
+    purge_params = ml_trading.machine_learning.validation_data.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
     embargo_period = datetime.timedelta(days=1),
     split_ratio = [0.8, 0.2, 0.0],
 )
@@ -70,16 +71,17 @@ data_sets = ml_trading.machine_learning.validation_data.create_split_moving_forw
     market_data.ingest.bq.common.DATASET_MODE.OKX, market_data.ingest.bq.common.EXPORT_MODE.BY_MINUTE, market_data.ingest.bq.common.AGGREGATION_MODE.TAKE_LASTEST,
     time_range=time_range,
     initial_training_fixed_window_size = datetime.timedelta(days=150),
-    purge_period = datetime.timedelta(minutes=30),
+    purge_params = ml_trading.machine_learning.validation_data.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
     embargo_period = datetime.timedelta(days=1),
     step_event_size = 300,
     validation_fixed_event_size = 300,
     test_fixed_event_size= 0,
+    window_type='fixed',
 )
 #'''
 
 
-import ml_trading.models.model
+import ml_trading.models.xgboost_model
 import ml_trading.models.deep_model
 
 metrics_list = []
@@ -94,21 +96,24 @@ for i, (train_df, validation_df, test_df) in enumerate(data_sets):
     validaiton_timerange_strs.append(f'{validation_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {validation_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')
     #print(f'test: {len(test_df)}\n{test_df.head(1).index}\n{test_df.tail(1).index}')
 
-    '''
-    model, metrics, validation_y_df = ml_trading.models.model.train_xgboost_model(
+    target_column='label_long_tp30_sl30_10m'
+    #'''
+    model, metrics, validation_y_df = ml_trading.models.xgboost_model.train_xgboost_model(
         #ml_data_df, 
         train_df=train_df,
         validation_df=validation_df,
-        target_column='label_long_tp30_sl30_10m',
+        target_column=target_column,
         prediction_threshold=0.70)
     #'''
 
-    #'''
+    '''
     model, metrics, validation_y_df = ml_trading.models.deep_model.train_mlp_model(
         #ml_data_df, 
         train_df=train_df,
         validation_df=validation_df,
-        target_column='label_long_tp30_sl30_10m',
+        target_column=target_column,
+        use_scaler=True,
+        use_norm=False,
         prediction_threshold=0.50)
     #'''
 

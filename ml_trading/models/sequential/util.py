@@ -24,7 +24,7 @@ def into_X_y(
         
     Returns:
         X: Feature matrix with 3D shape (samples, sequence_length, features)
-        y: Target values
+        y: Target values with shape (samples, 1)
         scaler: Fitted scaler
     """
     # Always get raw features from base function without scaling
@@ -52,7 +52,7 @@ def into_X_y(
                     # Handle scalar values by repeating them
                     X[i, :, j] = np.full(sequence_length, X_raw[i, j])
     else:
-        # Regular 2D data - check if it needs to be converted to 3D
+        # Regular 2D data - raise error if not 3D
         if len(X_raw.shape) == 2:
             raise ValueError(
                 f"Unexpected data shape: {X_raw.shape}. Data should be 3D."
@@ -82,5 +82,8 @@ def into_X_y(
             raise ValueError(
                 f"Expected 3D data for scaling but got shape {X.shape}"
             )
+    
+    # Reshape target values to (samples, 1) for compatibility with deep learning models
+    y = y.reshape(-1, 1)
     
     return X, y, scaler

@@ -1,6 +1,7 @@
 import pandas as pd
 import datetime
 from typing import Tuple, Optional, List, Dict, Any
+from dataclasses import dataclass
 from market_data.machine_learning.cache_ml_data import load_cached_ml_data
 from market_data.feature.impl.common import SequentialFeatureParam
 
@@ -8,9 +9,14 @@ import numpy as np
 from market_data.ingest.bq.common import DATASET_MODE, EXPORT_MODE, AGGREGATION_MODE
 import market_data.util.time
 
+@dataclass
+class PurgeParams:
+    purge_period: datetime.timedelta = datetime.timedelta(days=0)
+
+
 def _purge(
     ml_data: pd.DataFrame,
-    purge_period: datetime.timedelta = datetime.timedelta(days=0),
+    purge_params: PurgeParams,
 ) -> pd.DataFrame:
     """
     Remove data points that are within purge_period of each other.
@@ -25,7 +31,7 @@ def _purge(
         A purged DataFrame with selected data points.
     """
     # If no purging needed, return original data
-    if purge_period == datetime.timedelta(0):
+    if purge_params.purge_period == datetime.timedelta(0):
         return ml_data
     
     # Ensure the data is sorted by timestamp
@@ -59,7 +65,7 @@ def _purge(
                 
             time_diff = current_time - last_selected_time
             
-            if time_diff >= purge_period:
+            if time_diff >= purge_params.purge_period:
                 selected_rows.append(i)
                 last_selected_time = current_time
             else:
@@ -88,7 +94,7 @@ def create_train_validation_test_splits(
     target_params=None,
     resample_params=None,
     seq_params: SequentialFeatureParam = None,
-    purge_period: datetime.timedelta = datetime.timedelta(days=0),
+    purge_params: PurgeParams = PurgeParams(),
     embargo_period: datetime.timedelta = datetime.timedelta(days=1),
     window_type: str = 'fixed',  # 'fixed' or 'expanding'
     fixed_window_size: datetime.timedelta = datetime.timedelta(days=10),
@@ -106,7 +112,7 @@ def create_train_validation_test_splits(
         feature_params: Feature calculation parameters
         target_params: Target calculation parameters
         resample_params: Resampling parameters
-        purge_period: Timedelta for the purge period
+        purge_params: PurgeParams object specifying the purge period
         embargo_period: Timedelta for the embargo period
         window_type: 'fixed' for fixed-size window, 'expanding' for expanding window
         fixed_window_size: Timedelta for the fixed window size (default: 10 days)
@@ -137,7 +143,7 @@ def create_train_validation_test_splits(
         seq_params=seq_params,
     )
 
-    ml_data = _purge(ml_data, purge_period)
+    ml_data = _purge(ml_data, purge_params)
 
     data_sets = []
 
@@ -178,7 +184,7 @@ def create_split_moving_forward(
     target_params: Dict[str, Any] = None,
     resample_params: Dict[str, Any] = None,
     seq_params: SequentialFeatureParam = None,
-    purge_period: datetime.timedelta = datetime.timedelta(days=0),
+    purge_params: PurgeParams = PurgeParams(),
     embargo_period: datetime.timedelta = datetime.timedelta(days=1),
     window_type: str = 'fixed',  # 'fixed' or 'expanding'
     initial_training_fixed_window_size: datetime.timedelta = datetime.timedelta(days=10),
@@ -201,7 +207,7 @@ def create_split_moving_forward(
         feature_params: Parameters for feature generation
         target_params: Parameters for target generation
         resample_params: Parameters for resampling
-        purge_period: Period to purge from the end of each split
+        purge_params: Parameters for purging
         embargo_period: Period to embargo between splits
         window_type: Type of window ('fixed' or 'expanding')
         initial_training_fixed_window_size: Initial fixed time size of the training window
@@ -228,7 +234,11 @@ def create_split_moving_forward(
         resample_params=resample_params,
         seq_params=seq_params,
     )
-    ml_data = _purge(ml_data, purge_period)
+    ema_columns = [c for c in ml_data.columns if 'ema' in c]
+    volume_ratio_columns = [c for c in ml_data.columns if 'volume_ratio' in c]
+    ml_data = ml_data.drop(columns=ema_columns + volume_ratio_columns + ['bb_width', 'obv_pct_change'])
+
+    ml_data = _purge(ml_data, purge_params)
     
     # Sort by timestamp to ensure chronological order
     ml_data = ml_data.sort_index()
