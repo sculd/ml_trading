@@ -1,4 +1,4 @@
-import pandas as pd
+import numpy as np
 import market_data.machine_learning.resample as resample
 import ml_trading.machine_learning.validation_data as validation_data
 import ml_trading.streaming.candle_processor.candle_processor_base as candle_processor_base
@@ -29,17 +29,19 @@ class CumsumEventSeries(candle_processor_base.Series):
 
     def is_event(self):
         lt = self.truncate_epoch_seconds_at_minute(self.latest_timestamp_epoch_seconds)
-        diff_tvs = [(t, 0) for t, _ in self.series]
-        i_lt = 0
-        for i, (t,v) in enumerate(self.series):
-            if i > 0:
-                diff_tvs[i][1] = v - self.series[i-1][1]
+        pct_changes = [candle.close for _, candle in self.series]
+        for i in range(1, len(pct_changes)):
+            pct_changes[i] = (pct_changes[i] - pct_changes[i-1]) / pct_changes[i-1]
+        pct_changes = np.nan_to_num(pct_changes, 0)
 
-            if t == lt:
+        diff_tvs = [(t, 0) for t, _ in self.series]
+        for i in range(1, len(diff_tvs)):
+            diff_tvs[i][1] = pct_changes[i] - pct_changes[i-1]
+            if diff_tvs[i] == lt:
                 i_lt = i
 
         is_event = False
-        for i in range(i_lt+1, len(diff_tvs)):
+        for i in range(i_lt + 1, len(diff_tvs)):
             self.s_pos = max(0, self.s_pos + diff_tvs[i][1])
             self.s_neg = min(0, self.s_neg + diff_tvs[i][1])
             if self.s_pos > self.resample_params.threshold:
