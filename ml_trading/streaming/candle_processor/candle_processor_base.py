@@ -15,7 +15,8 @@ class CandleProcessorBase:
         if symbol not in self.serieses:
             self.serieses[symbol] = self.new_series()
         
-        result = self.serieses[symbol].on_candle(timestamp_epoch_seconds, open_, high_, low_, close_, volume)
+        candle = OHLCVCandle(open_, high_, low_, close_, volume)
+        result = self.serieses[symbol].on_candle(timestamp_epoch_seconds, candle)
         is_new_minute = result['is_new_minute']
 
         previous_latest_timestamp_epoch_seconds_truncated_daily = self.latest_timestamp_epoch_seconds_truncated_daily
@@ -26,7 +27,7 @@ class CandleProcessorBase:
         if is_new_minute:
             # process before adding new minute candle value to the series.
             self.on_new_minutes(symbol, timestamp_epoch_seconds)
-            self.serieses[symbol].append(timestamp_epoch_seconds, close_)
+            self.serieses[symbol].append(timestamp_epoch_seconds, candle)
 
     # override this
     def new_series(self):
@@ -46,20 +47,20 @@ class Series:
     def truncate_epoch_seconds_at_minute(self, timestamp_epoch_seconds):
         return int(timestamp_epoch_seconds / 60) * 60
 
-    def on_candle(self, timestamp_epoch_seconds, open_, high_, low_, close_, volume):
+    def on_candle(self, timestamp_epoch_seconds, candle: OHLCVCandle):
         #print(f'on_candle {timestamp}, {symbol}, {open_}, {high_}, {low_}, {close_}, {volume}')
         is_new_minute = False
-        if len(self.window_size) == 0:
-            self.series.append((timestamp_epoch_seconds, OHLCVCandle(open_, high_, low_, close_, volume)))
+        if len(self.series) == 0:
+            self.series.append((timestamp_epoch_seconds, candle))
         else:
             last_timestamp_epoch_seconds, last_candle = self.series[-1]
             if self.truncate_epoch_seconds_at_minute(last_timestamp_epoch_seconds) == self.truncate_epoch_seconds_at_minute(timestamp_epoch_seconds):
-                self.series[-1] = (timestamp_epoch_seconds, OHLCVCandle(open_, high_, low_, close_, volume))
+                self.series[-1] = [timestamp_epoch_seconds, candle]
             else:
                 copy_timestamp_epoch_seconds = self.truncate_epoch_seconds_at_minute(last_timestamp_epoch_seconds) + 60
                 # ffill the gap if any
                 while copy_timestamp_epoch_seconds < timestamp_epoch_seconds:
-                    self.series.append((copy_timestamp_epoch_seconds, last_candle))
+                    self.append(copy_timestamp_epoch_seconds, last_candle)
                     copy_timestamp_epoch_seconds += 60
                 # do not append new minute candle here yet.
                 # add it after processing the series up to theprevious minute.
@@ -67,7 +68,7 @@ class Series:
 
         self.latest_timestamp_epoch_seconds = timestamp_epoch_seconds
 
-        while len(self.series) > self.windows_size:
+        while len(self.series) > self.window_size:
             self.series.popleft()
 
         return {'is_new_minute': is_new_minute}
@@ -75,16 +76,17 @@ class Series:
     def append(self, timestamp_epoch_seconds: int, candle: OHLCVCandle):
         self.series.append((timestamp_epoch_seconds, candle))
 
-    def to_pandas(self, symbol: str):
+    def to_pandas(self, symbol: str, symbol_in_index: bool = False):
         """
         Convert the series data to a pandas DataFrame.
-        The timestamp column will be timezone-agnostic.
+        The timestamp column will be timezone-aware (America/New_York).
         
         Args:
             symbol: The symbol for the series
+            symbol_in_index: Whether to include symbol in the index. Defaults to False.
             
         Returns:
-            pd.DataFrame: DataFrame with timestamp, symbol, and OHLCV columns
+            pd.DataFrame: DataFrame with timestamp and optionally symbol as index
         """
         if not self.series:
             return pd.DataFrame()
@@ -93,7 +95,7 @@ class Series:
         data = []
         for timestamp, ohlcv in self.series:
             data.append({
-                'timestamp': pd.Timestamp(timestamp, unit='s', tz=None),  # timezone-agnostic
+                'timestamp': pd.Timestamp(timestamp, unit='s', tz='America/New_York'),  # timezone-aware New York
                 'symbol': symbol,
                 'open': ohlcv.open,
                 'high': ohlcv.high,
@@ -105,7 +107,10 @@ class Series:
         # Create DataFrame
         df = pd.DataFrame(data)
         
-        # Set timestamp and symbol as index
-        df = df.set_index(['timestamp', 'symbol'])
+        # Set index based on symbol_in_index parameter
+        if symbol_in_index:
+            df = df.set_index(['timestamp', 'symbol'])
+        else:
+            df = df.set_index('timestamp')
         
         return df

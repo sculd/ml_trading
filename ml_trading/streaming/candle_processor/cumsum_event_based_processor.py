@@ -11,7 +11,7 @@ class CumsumEventBasedProcessor(candle_processor_base.CandleProcessorBase):
         self.purge_params = purge_params
 
     def new_series(self):
-        return CumsumEventSeries(self.windows_size, self.resample_params)
+        return CumsumEventSeries(self.windows_size, self.resample_params, self.purge_params)
 
     def on_new_minutes(self, symbol, timestamp_epoch_seconds):
         result = self.serieses[symbol].is_event()
@@ -31,10 +31,11 @@ class CumsumEventSeries(candle_processor_base.Series):
         lt = self.truncate_epoch_seconds_at_minute(self.latest_timestamp_epoch_seconds)
         pct_changes = [candle.close for _, candle in self.series]
         for i in range(1, len(pct_changes)):
-            pct_changes[i] = (pct_changes[i] - pct_changes[i-1]) / pct_changes[i-1]
+            pct_changes[i] = 0 if pct_changes[i-1] == 0 else (pct_changes[i] - pct_changes[i-1]) / pct_changes[i-1]
         pct_changes = np.nan_to_num(pct_changes, 0)
 
-        diff_tvs = [(t, 0) for t, _ in self.series]
+        i_lt = 0
+        diff_tvs = [[t, 0] for t, _ in self.series]
         for i in range(1, len(diff_tvs)):
             diff_tvs[i][1] = pct_changes[i] - pct_changes[i-1]
             if diff_tvs[i] == lt:

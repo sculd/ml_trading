@@ -1,5 +1,6 @@
 import pandas as pd
 import logging
+import time
 from typing import List, Tuple, Dict, Any, Optional, Union
 import market_data.machine_learning.resample as resample
 import ml_trading.machine_learning.validation_data as validation_data
@@ -43,8 +44,9 @@ class MLTradingProcessor(cumsum_event_based_processor.CumsumEventBasedProcessor)
 
     def on_event(self, symbol, timestamp_epoch_seconds):
         ohlcv_df = self.serieses[symbol].to_pandas(symbol)
-        print(ohlcv_df)
+        epoch_seconds_prev_minute = 60 * int(timestamp_epoch_seconds / 60) - 60
 
+        t1 = time.time()
         feature_dict = {}
         for feature_label_param in self.feature_labels_params:
             feature_label, feature_params = feature_label_param
@@ -62,8 +64,15 @@ class MLTradingProcessor(cumsum_event_based_processor.CumsumEventBasedProcessor)
                 raise ValueError(f"Feature module {feature_label} does not have a calculate method")
 
             feature_df = calculate_fn(ohlcv_df, feature_params)
+            
+            # Keep only the row corresponding to the given timestamp and symbol
+            timestamp = pd.Timestamp(epoch_seconds_prev_minute, unit='s', tz='America/New_York')
+            feature_df = feature_df[feature_df.index.get_level_values('timestamp') == timestamp]
+            
             for col in feature_df.columns:
                 feature_dict[col] = feature_df[col].values
 
         features_df = pd.DataFrame(feature_dict)
+        t2 = time.time()
+        print(f"Time taken to calculate features: {t2 - t1} seconds")
         print(features_df)
