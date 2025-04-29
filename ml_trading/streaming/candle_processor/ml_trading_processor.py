@@ -1,12 +1,23 @@
 import pandas as pd
+import logging
+from typing import List, Tuple, Dict, Any, Optional, Union
 import market_data.machine_learning.resample as resample
+import ml_trading.machine_learning.validation_data as validation_data
 import ml_trading.streaming.candle_processor.candle_processor_base as candle_processor_base
 import ml_trading.streaming.candle_processor.cumsum_event_based_processor as cumsum_event_based_processor
+from market_data.feature.registry import get_feature_by_label, list_registered_features
+from market_data.feature.util import parse_feature_label_params
+
+logger = logging.getLogger(__name__)
 
 
 class MLTradingProcessor(cumsum_event_based_processor.CumsumEventBasedProcessor):
-    def __init__(self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams):
+    def __init__(
+            self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams,
+            feature_labels_params: Optional[List[Union[str, Tuple[str, Any]]]] = None,
+            ):
         super().__init__(windows_size, resample_params, purge_params)
+        self.feature_labels_params = parse_feature_label_params(feature_labels_params)
 
         """
         ['symbol', 'return_1', 'return_5', 'return_15', 'return_30', 'return_60',
@@ -34,3 +45,25 @@ class MLTradingProcessor(cumsum_event_based_processor.CumsumEventBasedProcessor)
         ohlcv_df = self.serieses[symbol].to_pandas(symbol)
         print(ohlcv_df)
 
+        feature_dict = {}
+        for feature_label_param in self.feature_labels_params:
+            feature_label, feature_params = feature_label_param
+
+            logger.info(f"Reading cached feature: {feature_label}")
+            
+            # Get the feature module
+            feature_module = get_feature_by_label(feature_label)
+            if feature_module is None:
+                logger.warning(f"Feature module '{feature_label}' not found, skipping cache read.")
+                continue
+
+            calculate_fn = getattr(feature_module, 'calculate', None)
+            if calculate_fn is None:
+                raise ValueError(f"Feature module {feature_label} does not have a calculate method")
+
+            feature_df = calculate_fn(ohlcv_df, feature_params)
+            for col in feature_df.columns:
+                feature_dict[col] = feature_df[col].values
+
+        features_df = pd.DataFrame(feature_dict)
+        print(features_df)
