@@ -66,6 +66,9 @@ class Series:
                 # add it after processing the series up to theprevious minute.
                 is_new_minute = True
 
+        if is_new_minute:
+            self.on_new_minute(timestamp_epoch_seconds)
+
         self.latest_timestamp_epoch_seconds = timestamp_epoch_seconds
 
         while len(self.series) > self.window_size:
@@ -75,6 +78,10 @@ class Series:
 
     def append(self, timestamp_epoch_seconds: int, candle: OHLCVCandle):
         self.series.append((timestamp_epoch_seconds, candle))
+
+    # override this
+    def on_new_minute(self, timestamp_epoch_seconds: int):
+        pass
 
     def to_pandas(self, symbol: str, symbol_in_index: bool = False):
         """

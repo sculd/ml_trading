@@ -17,7 +17,7 @@ class CumsumEventBasedProcessor(base.CandleProcessorBase):
 
     def on_new_minutes(self, symbol, timestamp_epoch_seconds):
         result = self.serieses[symbol].is_event()
-        if result['is_event']:
+        if result['is_event'] and not result['purged']:
             self.events.append((timestamp_epoch_seconds, symbol))
         return {'is_event': result['is_event'], 'purged': result['purged']}
     
@@ -25,8 +25,7 @@ class CumsumEventBasedProcessor(base.CandleProcessorBase):
         if not self.events:
             return pd.DataFrame()
             
-        data = [(pd.Timestamp(ts, unit='s', tz='America/New_York'), sym) 
-                for ts, sym in self.events]
+        data = [(pd.Timestamp(ts, unit='s', tz='America/New_York'), sym) for ts, sym in self.events]
         return pd.DataFrame(data, columns=['timestamp', 'symbol']).set_index('timestamp')
 
 
@@ -37,36 +36,37 @@ class CumsumEventSeries(base.Series):
         self.purge_params = purge_params
         self.s_pos = 0
         self.s_neg = 0
+        self.last_pct_change = 0
         self.latest_valid_event_timestamp_epoch_seconds_truncated_minutely = 0
 
     def is_event(self):
-        lt = self.truncate_epoch_seconds_at_minute(self.latest_timestamp_epoch_seconds)
-        pct_changes = [candle.close for _, candle in self.series]
-        for i in range(1, len(pct_changes)):
-            pct_changes[i] = 0 if pct_changes[i-1] == 0 else (pct_changes[i] - pct_changes[i-1]) / pct_changes[i-1]
-        pct_changes = np.nan_to_num(pct_changes, 0)
+        n = len(self.series)
+        if n < 2:
+            return {'is_event': False, 'purged': False}
 
-        i_lt = 0
-        diff_tvs = [[t, 0] for t, _ in self.series]
-        for i in range(1, len(diff_tvs)):
-            diff_tvs[i][1] = pct_changes[i] - pct_changes[i-1]
-            if diff_tvs[i] == lt:
-                i_lt = i
+        candle_1 = self.series[-1][1]
+        candle_0 = self.series[-2][1]
+        pct_change = 0 if candle_0.close == 0 else (candle_1.close - candle_0.close) / candle_0.close
+        diff = pct_change - self.last_pct_change
+        self.last_pct_change = pct_change
 
         is_event = False
-        for i in range(i_lt + 1, len(diff_tvs)):
-            self.s_pos = max(0, self.s_pos + diff_tvs[i][1])
-            self.s_neg = min(0, self.s_neg + diff_tvs[i][1])
-            if self.s_pos > self.resample_params.threshold:
-                is_event = True
-                self.s_pos = 0
-            elif self.s_neg < -self.resample_params.threshold:
-                is_event = True
-                self.s_neg = 0
+        self.s_pos = max(0, self.s_pos + diff)
+        self.s_neg = min(0, self.s_neg + diff)
+        if self.s_pos > self.resample_params.threshold:
+            is_event = True
+            self.s_pos = 0
+        elif self.s_neg < -self.resample_params.threshold:
+            is_event = True
+            self.s_neg = 0
 
-        dt_seconds = lt - self.latest_valid_event_timestamp_epoch_seconds_truncated_minutely
-        purged = dt_seconds <= self.purge_params.purge_period.seconds
-        if not purged:
-            self.latest_valid_event_timestamp_epoch_seconds_truncated_minutely = lt
+        purged = False
+        if is_event:
+            lt = self.truncate_epoch_seconds_at_minute(self.latest_timestamp_epoch_seconds)
+            dt_seconds = lt - self.latest_valid_event_timestamp_epoch_seconds_truncated_minutely
+
+            purged = dt_seconds <= self.purge_params.purge_period.seconds
+            if not purged:
+                self.latest_valid_event_timestamp_epoch_seconds_truncated_minutely = lt
 
         return {'is_event': is_event, 'purged': purged}
