@@ -4,15 +4,15 @@ import time
 from typing import List, Tuple, Dict, Any, Optional, Union
 import market_data.machine_learning.resample as resample
 import ml_trading.machine_learning.validation_data as validation_data
-import ml_trading.streaming.candle_processor.candle_processor_base as candle_processor_base
-import ml_trading.streaming.candle_processor.cumsum_event_based_processor as cumsum_event_based_processor
+import ml_trading.streaming.candle_processor.base as base
+import ml_trading.streaming.candle_processor.cumsum_event as cumsum_event
 from market_data.feature.registry import get_feature_by_label, list_registered_features
 from market_data.feature.util import parse_feature_label_params
 
 logger = logging.getLogger(__name__)
 
 
-class MLTradingProcessor(cumsum_event_based_processor.CumsumEventBasedProcessor):
+class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
     def __init__(
             self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams,
             feature_labels_params: Optional[List[Union[str, Tuple[str, Any]]]] = None,

@@ -1,24 +1,36 @@
+import pandas as pd
 import numpy as np
 import market_data.machine_learning.resample as resample
 import ml_trading.machine_learning.validation_data as validation_data
-import ml_trading.streaming.candle_processor.candle_processor_base as candle_processor_base
+import ml_trading.streaming.candle_processor.base as base
 
 
-class CumsumEventBasedProcessor(candle_processor_base.CandleProcessorBase):
+class CumsumEventBasedProcessor(base.CandleProcessorBase):
     def __init__(self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams):
         super().__init__(windows_size)
         self.resample_params = resample_params
         self.purge_params = purge_params
+        self.events = []
 
     def new_series(self):
         return CumsumEventSeries(self.windows_size, self.resample_params, self.purge_params)
 
     def on_new_minutes(self, symbol, timestamp_epoch_seconds):
         result = self.serieses[symbol].is_event()
+        if result['is_event']:
+            self.events.append((timestamp_epoch_seconds, symbol))
         return {'is_event': result['is_event'], 'purged': result['purged']}
+    
+    def get_events_df(self) -> pd.DataFrame:
+        if not self.events:
+            return pd.DataFrame()
+            
+        data = [(pd.Timestamp(ts, unit='s', tz='America/New_York'), sym) 
+                for ts, sym in self.events]
+        return pd.DataFrame(data, columns=['timestamp', 'symbol']).set_index('timestamp')
 
 
-class CumsumEventSeries(candle_processor_base.Series):
+class CumsumEventSeries(base.Series):
     def __init__(self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams):
         super().__init__(windows_size)
         self.resample_params = resample_params
@@ -47,8 +59,10 @@ class CumsumEventSeries(candle_processor_base.Series):
             self.s_neg = min(0, self.s_neg + diff_tvs[i][1])
             if self.s_pos > self.resample_params.threshold:
                 is_event = True
+                self.s_pos = 0
             elif self.s_neg < -self.resample_params.threshold:
                 is_event = True
+                self.s_neg = 0
 
         dt_seconds = lt - self.latest_valid_event_timestamp_epoch_seconds_truncated_minutely
         purged = dt_seconds <= self.purge_params.purge_period.seconds

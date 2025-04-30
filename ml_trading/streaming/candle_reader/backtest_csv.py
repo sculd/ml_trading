@@ -1,9 +1,9 @@
 import pandas as pd, numpy as np
 import datetime, time
 from collections import defaultdict, deque
-import ml_trading.streaming.candle_processor.candle_processor_base
-import ml_trading.streaming.candle_processor.cumsum_event_based_processor
-import ml_trading.streaming.candle_processor.ml_trading_processor
+import ml_trading.streaming.candle_processor.base
+import ml_trading.streaming.candle_processor.cumsum_event
+import ml_trading.streaming.candle_processor.ml_trading
 import market_data.machine_learning.resample as resample
 import ml_trading.machine_learning.validation_data as validation_data
 import logging
@@ -20,7 +20,7 @@ class CSVCandleReader:
         self.iterrows = df_prices_history.iterrows()
         self.history_read_i = 0
 
-        self.candle_cache = ml_trading.streaming.candle_processor.ml_trading_processor.MLTradingProcessor(
+        self.candle_processor = ml_trading.streaming.candle_processor.cumsum_event.CumsumEventBasedProcessor(
             windows_size=windows_minutes,
             resample_params=resample.ResampleParams(),
             purge_params=validation_data.PurgeParams(
@@ -42,7 +42,7 @@ class CSVCandleReader:
         epoch_seconds = candle['timestamp']
         if type(epoch_seconds) == pd.Timestamp:
             epoch_seconds = int(epoch_seconds.timestamp())
-        self.candle_cache.on_candle(epoch_seconds, candle['symbol'], candle['open'], candle['high'], candle['low'], candle['close'], candle['volume'])
+        self.candle_processor.on_candle(epoch_seconds, candle['symbol'], candle['open'], candle['high'], candle['low'], candle['close'], candle['volume'])
 
         if self.history_read_i % 10000 == 0:
             print(f'self.history_read_i: {self.history_read_i}, {candle.timestamp}, {candle.symbol}')
