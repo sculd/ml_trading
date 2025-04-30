@@ -17,8 +17,9 @@ class CumsumEventBasedProcessor(base.CandleProcessorBase):
 
     def on_new_minutes(self, symbol, timestamp_epoch_seconds):
         result = self.serieses[symbol].is_event()
-        if result['is_event'] and not result['purged']:
-            self.events.append((timestamp_epoch_seconds, symbol))
+        if result['is_event']:
+            t = base.truncate_epoch_seconds_at_minute(self.serieses[symbol].series[-1][0])
+            self.events.append((t, symbol))
         return {'is_event': result['is_event'], 'purged': result['purged']}
     
     def get_events_df(self) -> pd.DataFrame:
@@ -62,7 +63,7 @@ class CumsumEventSeries(base.Series):
 
         purged = False
         if is_event:
-            lt = self.truncate_epoch_seconds_at_minute(self.latest_timestamp_epoch_seconds)
+            lt = base.truncate_epoch_seconds_at_minute(self.latest_timestamp_epoch_seconds)
             dt_seconds = lt - self.latest_valid_event_timestamp_epoch_seconds_truncated_minutely
 
             purged = dt_seconds <= self.purge_params.purge_period.seconds

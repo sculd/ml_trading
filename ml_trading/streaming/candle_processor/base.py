@@ -5,6 +5,15 @@ import logging
 
 OHLCVCandle = namedtuple('OHLCVCandle', ['open', 'high', 'low', 'close', 'volume'])
 
+
+class CandleProcessorNoOp:
+    '''
+    To use as a performance baseline.
+    '''
+    def on_candle(self, timestamp_epoch_seconds, symbol, open_, high_, low_, close_, volume):
+        pass
+
+
 class CandleProcessorBase:
     def __init__(self, windows_size):
         self.serieses = {} # by symbol
@@ -38,14 +47,15 @@ class CandleProcessorBase:
         pass
 
 
+def truncate_epoch_seconds_at_minute(timestamp_epoch_seconds):
+    return int(timestamp_epoch_seconds / 60) * 60
+
+
 class Series:
     def __init__(self, window_size):
         self.window_size = window_size
         self.series = deque()
         self.latest_timestamp_epoch_seconds = 0
-
-    def truncate_epoch_seconds_at_minute(self, timestamp_epoch_seconds):
-        return int(timestamp_epoch_seconds / 60) * 60
 
     def on_candle(self, timestamp_epoch_seconds, candle: OHLCVCandle):
         #print(f'on_candle {timestamp}, {symbol}, {open_}, {high_}, {low_}, {close_}, {volume}')
@@ -54,10 +64,10 @@ class Series:
             self.series.append((timestamp_epoch_seconds, candle))
         else:
             last_timestamp_epoch_seconds, last_candle = self.series[-1]
-            if self.truncate_epoch_seconds_at_minute(last_timestamp_epoch_seconds) == self.truncate_epoch_seconds_at_minute(timestamp_epoch_seconds):
+            if truncate_epoch_seconds_at_minute(last_timestamp_epoch_seconds) == truncate_epoch_seconds_at_minute(timestamp_epoch_seconds):
                 self.series[-1] = [timestamp_epoch_seconds, candle]
             else:
-                copy_timestamp_epoch_seconds = self.truncate_epoch_seconds_at_minute(last_timestamp_epoch_seconds) + 60
+                copy_timestamp_epoch_seconds = truncate_epoch_seconds_at_minute(last_timestamp_epoch_seconds) + 60
                 # ffill the gap if any
                 while copy_timestamp_epoch_seconds < timestamp_epoch_seconds:
                     self.append(copy_timestamp_epoch_seconds, last_candle)

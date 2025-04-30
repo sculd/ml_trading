@@ -51,3 +51,6 @@ class CSVCandleReader:
 
         return True
 
+    def process_all_candles(self):
+        while self.process_next_candle():
+            pass
