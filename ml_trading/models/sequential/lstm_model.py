@@ -150,10 +150,10 @@ def train_lstm_model(
     )
     
     # Convert numpy arrays to PyTorch tensors
-    X_train_tensor = torch.FloatTensor(X_train)
-    y_train_tensor = torch.FloatTensor(y_train)
-    X_val_tensor = torch.FloatTensor(X_val)
-    y_val_tensor = torch.FloatTensor(y_val)
+    X_train_tensor = torch.FloatTensor(X_train.values)
+    y_train_tensor = torch.FloatTensor(y_train.values)
+    X_val_tensor = torch.FloatTensor(X_val.values)
+    y_val_tensor = torch.FloatTensor(y_val.values)
 
     # Create DataLoaders
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)    

@@ -29,6 +29,7 @@ def into_X_y(
     """
     # Always get raw features from base function without scaling
     X_raw, y, _ = ml_trading.models.util.into_X_y(df, target_column, scaler=None, use_scaler=False)
+    X_raw, y = X_raw.values, y.values
     
     # Check if we need to extract sequences from complex objects
     # (where each cell in the DataFrame might contain an array/list)

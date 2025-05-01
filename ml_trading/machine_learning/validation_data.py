@@ -181,9 +181,9 @@ def create_split_moving_forward(
     export_mode: EXPORT_MODE,
     aggregation_mode: AGGREGATION_MODE,
     time_range: market_data.util.time.TimeRange,
-    target_params: Dict[str, Any] = None,
-    resample_params: Dict[str, Any] = None,
-    seq_params: SequentialFeatureParam = None,
+    target_params: Optional[market_data.target.target.TargetParamsBatch] = None,
+    resample_params: Optional[market_data.machine_learning.resample.ResampleParams] = None,
+    seq_params: Optional[SequentialFeatureParam] = None,
     purge_params: PurgeParams = PurgeParams(),
     embargo_period: datetime.timedelta = datetime.timedelta(days=1),
     window_type: str = 'fixed',  # 'fixed' or 'expanding'
@@ -230,7 +230,7 @@ def create_split_moving_forward(
         export_mode=export_mode,
         aggregation_mode=aggregation_mode,
         time_range=time_range,
-        target_params=target_params,
+        target_params_batch=target_params,
         resample_params=resample_params,
         seq_params=seq_params,
     )

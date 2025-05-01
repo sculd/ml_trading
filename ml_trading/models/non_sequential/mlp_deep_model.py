@@ -59,7 +59,7 @@ class MLPModel(nn.Module):
             
         return self.model(x)
 
-    def predict_batch(self, X):
+    def predict(self, X):
         # Make predictions
         self.eval()
         with torch.no_grad():

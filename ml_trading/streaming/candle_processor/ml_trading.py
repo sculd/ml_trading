@@ -8,20 +8,27 @@ import ml_trading.machine_learning.validation_data as validation_data
 import ml_trading.streaming.candle_processor.base as base
 import ml_trading.streaming.candle_processor.cumsum_event as cumsum_event
 from market_data.feature.registry import get_feature_by_label, list_registered_features
-from market_data.feature.util import parse_feature_label_params
+from market_data.feature.util import parse_feature_label_params, get_warmup_period
+import ml_trading.models.model
 
 logger = logging.getLogger(__name__)
 
 
 class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
     def __init__(
-            self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams,
+            self, 
+            resample_params: resample.ResampleParams, 
+            purge_params: validation_data.PurgeParams,
             feature_labels_params: Optional[List[Union[str, Tuple[str, Any]]]] = None,
+            model: Optional[ml_trading.models.model.Model] = None,
             threshold: float = 0.5,
             target_params: market_data.target.target.TargetParams = market_data.target.target.TargetParams(),
             ):
-        super().__init__(windows_size, resample_params, purge_params)
+        warmup_period = get_warmup_period(feature_labels_params)
+        warmup_minutes = warmup_period.total_seconds() // 60
+        super().__init__(warmup_minutes, resample_params, purge_params)
         self.feature_labels_params = parse_feature_label_params(feature_labels_params)
+        self.model = model
         self.threshold = threshold
         self.target_params = target_params
 
@@ -40,9 +47,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
 
     def on_new_minutes(self, symbol, timestamp_epoch_seconds):
         result = super().on_new_minutes(symbol, timestamp_epoch_seconds)
-        is_event = result['is_event']
-        purged = result['purged']
-        if not is_event or purged:
+        if not result['is_event'] or result['purged']:
             return
 
         self.on_event(symbol, timestamp_epoch_seconds)
@@ -82,4 +87,4 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         print(f"Time taken to calculate features: {t2 - t1} seconds")
         print(features_df)
 
-        prediction = 0
+        #prediction = self.model.predict(features_df)

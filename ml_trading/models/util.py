@@ -22,7 +22,7 @@ def into_X_y(
     target_column: str,
     scaler: Optional[StandardScaler] = None,
     use_scaler: bool = False,
-) -> Tuple[np.ndarray, np.ndarray, StandardScaler]:
+) -> Tuple[pd.DataFrame, pd.DataFrame, StandardScaler]:
     """Process data for HMM model assuming data is already sequentialized.
     
     Args:
@@ -47,9 +47,9 @@ def into_X_y(
         assert col not in df.columns    
 
     # Extract features (all columns except target)
-    X = df.drop(columns=[target_column]).values
+    X = df.drop(columns=[target_column])
     
-    y = df[target_column].values
+    y = df[target_column]
     #y[y == -1] = 0
     
     # Scale features if needed

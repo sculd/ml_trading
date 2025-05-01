@@ -1,5 +1,6 @@
 import pandas as pd, numpy as np
 import datetime, time
+import os
 from collections import defaultdict, deque
 import ml_trading.streaming.candle_processor.base
 import ml_trading.streaming.candle_processor.cumsum_event
@@ -10,25 +11,61 @@ import logging
 
 
 class CSVCandleReader:
-    def __init__(self, filename, windows_minutes):
-        df_prices_history = pd.read_parquet(filename)
-        #df_prices_history['time'] = pd.to_datetime(df_prices_history['timestamp'], unit='s')
-        if 'timestamp' in df_prices_history.index.names:
-            df_prices_history = df_prices_history.reset_index()
-
-        self.df_prices_history = df_prices_history
-        self.iterrows = df_prices_history.iterrows()
+    def __init__(self, history_filename, model = None):
+        self.df_prices_history = self._read_file(history_filename)
+        self.iterrows = self.df_prices_history.iterrows()
         self.history_read_i = 0
 
-        self.candle_processor = ml_trading.streaming.candle_processor.cumsum_event.CumsumEventBasedProcessor(
-            windows_size=windows_minutes,
+        self.candle_processor_evt = ml_trading.streaming.candle_processor.cumsum_event.CumsumEventBasedProcessor(
+            windows_size=60,
             resample_params=resample.ResampleParams(),
             purge_params=validation_data.PurgeParams(
                 purge_period=datetime.timedelta(minutes=30)
             )
         )
 
-        logging.info(f'csv price cache loaded {filename}')
+        self.candle_processor = ml_trading.streaming.candle_processor.ml_trading.MLTradingProcessor(
+            resample_params=resample.ResampleParams(),
+            purge_params=validation_data.PurgeParams(
+                purge_period=datetime.timedelta(minutes=30)
+            ),
+            model=model,
+        )
+
+        logging.info(f'Price data loaded from {history_filename} with {len(self.df_prices_history)} rows')
+
+    def _read_file(self, filename):
+        # Determine file type based on extension
+        file_extension = os.path.splitext(filename)[1].lower()
+        
+        # Load data based on file extension
+        if file_extension == '.parquet':
+            df_prices_history = pd.read_parquet(filename)
+        elif file_extension == '.csv':
+            df_prices_history = pd.read_csv(filename)
+            df_prices_history['timestamp'] = pd.to_datetime(df_prices_history['timestamp'], unit='s')
+        elif file_extension == '.pickle' or file_extension == '.pkl':
+            df_prices_history = pd.read_pickle(filename)
+        elif file_extension == '.feather':
+            df_prices_history = pd.read_feather(filename)
+        elif file_extension == '.h5' or file_extension == '.hdf5':
+            df_prices_history = pd.read_hdf(filename)
+        elif file_extension == '.json':
+            df_prices_history = pd.read_json(filename)
+        else:
+            raise ValueError(f"Unsupported file format: {file_extension}. Supported formats: .parquet, .csv, .pickle, .pkl, .feather, .h5, .hdf5, .json")
+        
+        # If timestamp is in index, reset it to column
+        if 'timestamp' in df_prices_history.index.names:
+            df_prices_history = df_prices_history.reset_index()
+
+        # Ensure required columns exist
+        required_columns = ['timestamp', 'symbol', 'open', 'high', 'low', 'close', 'volume']
+        missing_columns = [col for col in required_columns if col not in df_prices_history.columns]
+        if missing_columns:
+            raise ValueError(f"Input file missing required columns: {missing_columns}")
+
+        return df_prices_history
 
     def _get_next_candle(self):
         return next(self.iterrows, None)

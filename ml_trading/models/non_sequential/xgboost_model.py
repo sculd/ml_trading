@@ -3,9 +3,76 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import xgboost as xgb
-from typing import Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any
 import ml_trading.machine_learning.util
 from ml_trading.models.util import into_X_y
+import ml_trading.models.model
+import os
+import json
+import pickle
+
+
+class XGBoostModel(ml_trading.models.model.Model):
+    def __init__(
+        self, 
+        model_name: str,
+        columns: List[str],
+        target: str,
+        xgb_model: xgb.XGBRegressor,
+        ):
+        super().__init__(model_name, columns, target)
+        self.xgb_model = xgb_model
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        return self.xgb_model.predict(X)
+    
+    def save(self, filename: str):
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
+        
+        # Save the XGBoost model
+        model_filename = f"{filename}.xgb"
+        self.xgb_model.save_model(model_filename)
+        
+        # Save metadata (model name, columns, target)
+        metadata = {
+            'model_name': self.model_name,
+            'columns': self.columns,
+            'target': self.target
+        }
+        
+        metadata_filename = f"{filename}.meta.json"
+        with open(metadata_filename, 'w') as f:
+            json.dump(metadata, f)
+            
+        print(f"Model saved to {model_filename} with metadata in {metadata_filename}")
+
+    @classmethod
+    def load(cls, filename: str):
+        # Load metadata
+        metadata_filename = f"{filename}.meta.json"
+        if not os.path.exists(metadata_filename):
+            raise FileNotFoundError(f"Metadata file not found: {metadata_filename}")
+            
+        with open(metadata_filename, 'r') as f:
+            metadata = json.load(f)
+            
+        # Load XGBoost model
+        model_filename = f"{filename}.xgb"
+        if not os.path.exists(model_filename):
+            raise FileNotFoundError(f"Model file not found: {model_filename}")
+            
+        xgb_model = xgb.XGBRegressor()
+        xgb_model.load_model(model_filename)
+        
+        # Create and return XGBoostModel instance
+        return cls(
+            model_name=metadata['model_name'],
+            columns=metadata['columns'],
+            target=metadata['target'],
+            xgb_model=xgb_model
+        )
+
 
 def train_xgboost_model(
     #data_df: pd.DataFrame,
@@ -70,20 +137,26 @@ def train_xgboost_model(
         }
     
     # Initialize and train the model
-    model = xgb.XGBRegressor(**xgb_params)
-    model.fit(
-        X_train, y_train,
-        eval_set=[(X_test, y_test)],
+    xgb_model = xgb.XGBRegressor(**xgb_params)
+    xgb_model.fit(
+        X_train.values, y_train.values,
+        eval_set=[(X_test.values, y_test.values)],
         verbose=False
     )
     
     # Make predictions
-    y_pred = model.predict(X_test)
+    y_pred = xgb_model.predict(X_test.values)
 
     validation_y_df = pd.DataFrame(index=validation_df.index)
     validation_y_df['symbol'] = validation_df['symbol']
-    validation_y_df['y'] = y_test
+    validation_y_df['y'] = y_test.values
     validation_y_df['pred'] = y_pred
     validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
 
+    model = XGBoostModel(
+        "xgboost_model",
+        columns=X_train.columns.tolist(),
+        target=target_column,
+        xgb_model=xgb_model,
+    )
     return model, ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df

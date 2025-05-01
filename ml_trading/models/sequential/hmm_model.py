@@ -188,13 +188,13 @@ def train_hmm_model(
     )
     
     # Fit the model
-    model.fit(X_train)
+    model.fit(X_train.values)
     
     # Create mapping from states to target values
-    model.create_state_to_target_map(X_train, y_train)
+    model.create_state_to_target_map(X_train.values, y_train.values)
     
     # Compute metrics
-    train_score = model.model.score(X_train)
+    train_score = model.model.score(X_train.values)
     val_score = model.model.score(X_val)
     logger.info(f"Train log-likelihood: {train_score:.4f}")
     logger.info(f"Validation log-likelihood: {val_score:.4f}")
