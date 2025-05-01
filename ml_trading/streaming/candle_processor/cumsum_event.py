@@ -19,15 +19,15 @@ class CumsumEventBasedProcessor(base.CandleProcessorBase):
         result = self.serieses[symbol].is_event()
         if result['is_event']:
             t = base.truncate_epoch_seconds_at_minute(self.serieses[symbol].series[-1][0])
-            self.events.append((t, symbol))
+            self.events.append((t, symbol, result['purged']))
         return {'is_event': result['is_event'], 'purged': result['purged']}
     
     def get_events_df(self) -> pd.DataFrame:
         if not self.events:
             return pd.DataFrame()
             
-        data = [(pd.Timestamp(ts, unit='s', tz='America/New_York'), sym) for ts, sym in self.events]
-        return pd.DataFrame(data, columns=['timestamp', 'symbol']).set_index('timestamp')
+        data = [(pd.Timestamp(ts, unit='s', tz='America/New_York'), sym, purged) for ts, sym, purged in self.events]
+        return pd.DataFrame(data, columns=['timestamp', 'symbol', 'purged']).set_index('timestamp')
 
 
 class CumsumEventSeries(base.Series):

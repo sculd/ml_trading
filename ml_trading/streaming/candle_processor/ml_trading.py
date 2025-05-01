@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 import time
 from typing import List, Tuple, Dict, Any, Optional, Union
+import market_data.target.target 
 import market_data.machine_learning.resample as resample
 import ml_trading.machine_learning.validation_data as validation_data
 import ml_trading.streaming.candle_processor.base as base
@@ -16,9 +17,13 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
     def __init__(
             self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams,
             feature_labels_params: Optional[List[Union[str, Tuple[str, Any]]]] = None,
+            threshold: float = 0.5,
+            target_params: market_data.target.target.TargetParams = market_data.target.target.TargetParams(),
             ):
         super().__init__(windows_size, resample_params, purge_params)
         self.feature_labels_params = parse_feature_label_params(feature_labels_params)
+        self.threshold = threshold
+        self.target_params = target_params
 
         """
         ['symbol', 'return_1', 'return_5', 'return_15', 'return_30', 'return_60',
@@ -76,3 +81,5 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         t2 = time.time()
         print(f"Time taken to calculate features: {t2 - t1} seconds")
         print(features_df)
+
+        prediction = 0
