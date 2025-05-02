@@ -103,7 +103,9 @@ for i, (train_df, validation_df, test_df) in enumerate(data_sets):
         #ml_data_df, 
         train_df=train_df,
         validation_df=validation_df,
-        target_column=target_column)
+        target_column=target_column,
+        use_scaler=True,
+        )
     #'''
 
     metrics_list.append(result['metrics'] if 'metrics' in result else {})

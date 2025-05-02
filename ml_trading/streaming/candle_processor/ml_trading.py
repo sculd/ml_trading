@@ -1,3 +1,5 @@
+import market_data.feature
+import market_data.feature.registry
 import pandas as pd
 import logging
 import time
@@ -7,7 +9,8 @@ import market_data.machine_learning.resample as resample
 import ml_trading.machine_learning.validation_data as validation_data
 import ml_trading.streaming.candle_processor.base as base
 import ml_trading.streaming.candle_processor.cumsum_event as cumsum_event
-from market_data.feature.registry import get_feature_by_label, list_registered_features
+import market_data.feature.registry
+from market_data.feature.registry import get_feature_by_label
 from market_data.feature.util import parse_feature_label_params, get_warmup_period
 import ml_trading.models.model
 
@@ -19,15 +22,17 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
             self, 
             resample_params: resample.ResampleParams, 
             purge_params: validation_data.PurgeParams,
-            feature_labels_params: Optional[List[Union[str, Tuple[str, Any]]]] = None,
             model: Optional[ml_trading.models.model.Model] = None,
             threshold: float = 0.5,
             target_params: market_data.target.target.TargetParams = market_data.target.target.TargetParams(),
             ):
-        warmup_period = get_warmup_period(feature_labels_params)
+        if model is not None:
+            self.feature_labels_params = market_data.feature.registry.find_feature_params_for_columns(model.columns)
+        else:
+            self.feature_labels_params = parse_feature_label_params(None)
+        warmup_period = get_warmup_period(self.feature_labels_params)
         warmup_minutes = warmup_period.total_seconds() // 60
         super().__init__(warmup_minutes, resample_params, purge_params)
-        self.feature_labels_params = parse_feature_label_params(feature_labels_params)
         self.model = model
         self.threshold = threshold
         self.target_params = target_params

@@ -33,30 +33,13 @@ class XGBoostModel(ml_trading.models.model.Model):
         # Save the XGBoost model
         model_filename = f"{filename}.xgb"
         self.xgb_model.save_model(model_filename)
-        
-        # Save metadata (model name, columns, target)
-        metadata = {
-            'model_name': self.model_name,
-            'columns': self.columns,
-            'target': self.target
-        }
-        
-        metadata_filename = f"{filename}.meta.json"
-        with open(metadata_filename, 'w') as f:
-            json.dump(metadata, f)
-            
-        print(f"Model saved to {model_filename} with metadata in {metadata_filename}")
+
+        super().save_metadata(filename)
+        print(f"Model saved to {model_filename}")
 
     @classmethod
     def load(cls, filename: str):
-        # Load metadata
-        metadata_filename = f"{filename}.meta.json"
-        if not os.path.exists(metadata_filename):
-            raise FileNotFoundError(f"Metadata file not found: {metadata_filename}")
-            
-        with open(metadata_filename, 'r') as f:
-            metadata = json.load(f)
-            
+        metadata = ml_trading.models.model.Model.load_metadata(filename)
         # Load XGBoost model
         model_filename = f"{filename}.xgb"
         if not os.path.exists(model_filename):

@@ -8,6 +8,8 @@ import numpy as np
 import time
 import market_data.util.time
 import ml_trading.machine_learning.util
+import xgboost as xgb
+import ml_trading.models.non_sequential.xgboost_model
 
 # OpenMP threading issue
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -32,12 +34,12 @@ _PROJECT_ID = os.getenv('GOOGLE_CLOUD_PROJECT')
 if not _PROJECT_ID:
     logging.warning("GOOGLE_CLOUD_PROJECT environment variable not set. Please check your .env file.")
 
-
+model = ml_trading.models.non_sequential.xgboost_model.XGBoostModel.load("xgboost_model")
 
 import ml_trading.streaming.candle_reader.backtest_csv
 csv_candle_reader = ml_trading.streaming.candle_reader.backtest_csv.CSVCandleReader(
-    filename='2024_03_13.parquet',
-    windows_minutes=60,
+    history_filename='2024_03_13.parquet',
+    model=model,
 )
 
 t1 = time.time()

@@ -81,8 +81,8 @@ data_sets = ml_trading.machine_learning.validation_data.create_split_moving_forw
 #'''
 
 
-import ml_trading.models.xgboost_model
-import ml_trading.models.deep_model
+import ml_trading.models.non_sequential.xgboost_model
+import ml_trading.models.non_sequential.mlp_deep_model
 
 metrics_list = []
 validaiton_timerange_strs = []
@@ -98,7 +98,7 @@ for i, (train_df, validation_df, test_df) in enumerate(data_sets):
 
     target_column='label_long_tp30_sl30_10m'
     #'''
-    model, metrics, validation_y_df = ml_trading.models.xgboost_model.train_xgboost_model(
+    model, metrics, validation_y_df = ml_trading.models.non_sequential.xgboost_model.train_xgboost_model(
         #ml_data_df, 
         train_df=train_df,
         validation_df=validation_df,
@@ -116,6 +116,8 @@ for i, (train_df, validation_df, test_df) in enumerate(data_sets):
         use_norm=False,
         prediction_threshold=0.50)
     #'''
+
+    #model.save("xgboost_model")
 
     metrics_list.append(metrics)
     validation_y_df['model_num'] = i+1
