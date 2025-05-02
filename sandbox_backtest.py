@@ -8,7 +8,6 @@ import numpy as np
 import time
 import market_data.util.time
 import ml_trading.machine_learning.util
-import xgboost as xgb
 import ml_trading.models.non_sequential.xgboost_model
 
 # OpenMP threading issue
@@ -52,6 +51,10 @@ print(events_df)
 
 import pprint
 pprint.pprint(csv_candle_reader.candle_processor.pnl.get_stats())
+
+print(csv_candle_reader.candle_processor.pnl.get_positions_df())
+
+print(csv_candle_reader.candle_processor.pnl.get_return_curve())
 
 print('done')
 

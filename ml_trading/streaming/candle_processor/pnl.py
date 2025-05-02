@@ -16,7 +16,7 @@ class Position:
     entry_price: float
     side: str  # 'long' or 'short'
     size: float = 1.0
-    exit_timestamp: Optional[int] = None
+    exit_epoch_seconds: Optional[int] = None
     exit_price: Optional[float] = None
     exit_reason: Optional[str] = None  # 'tp', 'sl', 'timeout', or custom
     pnl_return: Optional[float] = None
@@ -59,7 +59,7 @@ class PNLMixin:
             return None
             
         position = self.active_positions[symbol]
-        position.exit_timestamp = timestamp_epoch_seconds
+        position.exit_epoch_seconds = timestamp_epoch_seconds
         position.exit_price = exit_price
         position.exit_reason = reason
         
@@ -148,18 +148,18 @@ class PNLMixin:
         for p in self.positions:
             data.append({
                 'symbol': p.symbol,
-                'entry_epoch_seconds': pd.Timestamp(p.entry_epoch_seconds, unit='s', tz='America/New_York'),
-                'exit_timestamp': pd.Timestamp(p.exit_timestamp, unit='s', tz='America/New_York') if p.exit_timestamp else None,
+                'entry_timestamp': pd.Timestamp(p.entry_epoch_seconds, unit='s', tz='America/New_York'),
+                'exit_timestamp': pd.Timestamp(p.exit_epoch_seconds, unit='s', tz='America/New_York') if p.exit_epoch_seconds else None,
                 'side': p.side,
                 'size': p.size,
                 'entry_price': p.entry_price,
                 'exit_price': p.exit_price,
                 'exit_reason': p.exit_reason,
                 'pnl_return': p.pnl_return,
-                'duration_minutes': (p.exit_timestamp - p.entry_epoch_seconds) / 60 if p.exit_timestamp else None
+                'duration_minutes': (p.exit_epoch_seconds - p.entry_epoch_seconds) / 60 if p.exit_epoch_seconds else None
             })
             
-        return pd.DataFrame(data)
+        return pd.DataFrame(data).set_index(['entry_timestamp', 'symbol'])
     
     def get_stats(self) -> Dict[str, Any]:
         """
@@ -237,14 +237,14 @@ class PNLMixin:
         """
         df = self.get_positions_df()
         if df.empty:
-            return pd.DataFrame(columns=['timestamp', 'return'])
+            return pd.DataFrame()
             
         # Filter to closed positions and sort by exit time
-        closed_df = df[df['exit_timestamp'].notna()].sort_values('exit_timestamp')
+        closed_df = df[df['exit_timestamp'].notna()].reset_index().set_index('entry_timestamp')
         
         if closed_df.empty:
-            return pd.DataFrame(columns=['timestamp', 'return'])
+            return pd.DataFrame()
         
         closed_df['return'] = closed_df['pnl_return'].cumsum()
-        return closed_df[['timestamp', 'return']]
+        return closed_df[['return']]
         

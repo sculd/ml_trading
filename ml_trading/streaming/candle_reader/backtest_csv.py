@@ -30,6 +30,7 @@ class CSVCandleReader:
                 purge_period=datetime.timedelta(minutes=30)
             ),
             model=model,
+            threshold=0.7,
         )
 
         logging.info(f'Price data loaded from {history_filename} with {len(self.df_prices_history)} rows')
