@@ -13,6 +13,7 @@ import market_data.feature.registry
 from market_data.feature.registry import get_feature_by_label
 from market_data.feature.util import parse_feature_label_params, get_warmup_period
 import ml_trading.models.model
+import ml_trading.streaming.candle_processor.pnl
 
 _btc_symbol_patterns: List[str] = ["BTC", "BTCUSDT", "BTC-USDT"]
 
@@ -35,10 +36,13 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         warmup_period = get_warmup_period(self.feature_labels_params)
         warmup_minutes = warmup_period.total_seconds() // 60
         super().__init__(warmup_minutes, resample_params, purge_params)
+
         self.model = model
         self.threshold = threshold
         self.target_params = target_params
         self.btc_symbol = None
+
+        self.pnl = ml_trading.streaming.candle_processor.pnl.PNLMixin(target_params=target_params)
 
         """
         ['symbol', 'return_1', 'return_5', 'return_15', 'return_30', 'return_60',
@@ -67,6 +71,9 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
     def on_new_minutes(self, symbol, timestamp_epoch_seconds):
         self._set_btc_symbol()
         result = super().on_new_minutes(symbol, timestamp_epoch_seconds)
+        candle = self.serieses[symbol].series[-1]
+        self.pnl.on_new_minutes(symbol, timestamp_epoch_seconds, candle)
+
         if not result['is_event'] or result['purged']:
             return
 
@@ -113,6 +120,20 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         features_df = pd.DataFrame(feature_dict)
         t2 = time.time()
         print(f"Time taken to calculate features: {t2 - t1} seconds")
-        print(features_df)
+        ema_columns = [c for c in features_df.columns if 'ema' in c]
+        volume_ratio_columns = [c for c in features_df.columns if 'volume_ratio' in c]
+        features_df = features_df.drop(columns=ema_columns + volume_ratio_columns + ['bb_width', 'obv_pct_change'])
 
-        #prediction = self.model.predict(features_df)
+        prediction = self.model.predict(features_df.values)
+        print(f"{prediction=}")
+
+        candle = self.serieses[symbol].series[-1]
+        if prediction > self.threshold:
+            print(f"Prediction {prediction} is greater than threshold {self.threshold}, buying {symbol}")
+            self.pnl.enter(symbol, timestamp_epoch_seconds, 'long', candle.close)
+        elif prediction < -self.threshold:
+            print(f"Prediction {prediction} is less than threshold -{self.threshold}, selling {symbol}")
+            self.pnl.enter(symbol, timestamp_epoch_seconds, 'short', candle.close)
+        else:
+            print(f"Prediction {prediction} is between threshold {self.threshold} and -{self.threshold}, no action for {symbol}")
+
