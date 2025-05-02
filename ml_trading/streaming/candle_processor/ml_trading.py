@@ -14,6 +14,8 @@ from market_data.feature.registry import get_feature_by_label
 from market_data.feature.util import parse_feature_label_params, get_warmup_period
 import ml_trading.models.model
 
+_btc_symbol_patterns: List[str] = ["BTC", "BTCUSDT", "BTC-USDT"]
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +38,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         self.model = model
         self.threshold = threshold
         self.target_params = target_params
+        self.btc_symbol = None
 
         """
         ['symbol', 'return_1', 'return_5', 'return_15', 'return_30', 'return_60',
@@ -50,7 +53,19 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         'label_long_tp30_sl30_10m', 'label_short_tp30_sl30_10m']
         """
 
+    def _set_btc_symbol(self):
+        if self.btc_symbol is not None:
+            return
+
+        btc_symbols = [s for s in self.serieses.keys() if any(pattern.upper() in s.upper() for pattern in _btc_symbol_patterns)]
+        if not btc_symbols:
+            return
+        
+        # Use the first matching BTC symbol found
+        self.btc_symbol = btc_symbols[0]
+
     def on_new_minutes(self, symbol, timestamp_epoch_seconds):
+        self._set_btc_symbol()
         result = super().on_new_minutes(symbol, timestamp_epoch_seconds)
         if not result['is_event'] or result['purged']:
             return
@@ -59,6 +74,11 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
 
     def on_event(self, symbol, timestamp_epoch_seconds):
         ohlcv_df = self.serieses[symbol].to_pandas(symbol)
+        if self.btc_symbol:
+            ohlcv_btc_df = self.serieses[self.btc_symbol].to_pandas(self.btc_symbol)
+        else:
+            ohlcv_btc_df = None
+
         epoch_seconds_prev_minute = 60 * int(timestamp_epoch_seconds / 60) - 60
 
         t1 = time.time()
@@ -78,11 +98,14 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
             if calculate_fn is None:
                 raise ValueError(f"Feature module {feature_label} does not have a calculate method")
 
-            feature_df = calculate_fn(ohlcv_df, feature_params)
+            if feature_label == 'btc_features':
+                feature_df = calculate_fn(pd.concat([ohlcv_df, ohlcv_btc_df]), feature_params)
+            else:
+                feature_df = calculate_fn(ohlcv_df, feature_params)
             
             # Keep only the row corresponding to the given timestamp and symbol
             timestamp = pd.Timestamp(epoch_seconds_prev_minute, unit='s', tz='America/New_York')
-            feature_df = feature_df[feature_df.index.get_level_values('timestamp') == timestamp]
+            feature_df = feature_df[(feature_df.index.get_level_values('timestamp') == timestamp) & (feature_df.index.get_level_values('symbol') == symbol)]
             
             for col in feature_df.columns:
                 feature_dict[col] = feature_df[col].values

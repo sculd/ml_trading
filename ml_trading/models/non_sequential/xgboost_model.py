@@ -33,9 +33,8 @@ class XGBoostModel(ml_trading.models.model.Model):
         # Save the XGBoost model
         model_filename = f"{filename}.xgb"
         self.xgb_model.save_model(model_filename)
-
-        super().save_metadata(filename)
         print(f"Model saved to {model_filename}")
+        self.save_metadata(filename)
 
     @classmethod
     def load(cls, filename: str):
