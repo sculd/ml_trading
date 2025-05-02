@@ -198,16 +198,10 @@ class PNLMixin:
         
         # Calculate drawdown
         if not closed_df.empty:
-            # Need to calculate dollar PnL for drawdown calculation
-            closed_df['pnl_dollar'] = closed_df.apply(
-                lambda row: row['pnl_return'] * row['entry_price'] * row['size'], 
-                axis=1
-            )
-            
             closed_df = closed_df.sort_values('exit_timestamp')
-            closed_df['cumulative_pnl'] = closed_df['pnl_dollar'].cumsum()
-            closed_df['peak'] = closed_df['cumulative_pnl'].cummax()
-            closed_df['drawdown'] = closed_df['peak'] - closed_df['cumulative_pnl']
+            closed_df['cumulative_return'] = closed_df['pnl_return'].cumsum()
+            closed_df['peak'] = closed_df['cumulative_return'].cummax()
+            closed_df['drawdown'] = closed_df['peak'] - closed_df['cumulative_return']
             max_drawdown = closed_df['drawdown'].max()
             
             # Sharpe ratio (simplified)
@@ -224,6 +218,7 @@ class PNLMixin:
             'total_trades': total_trades,
             'win_rate': win_rate,
             'profit_factor': profit_factor,
+            'cumulative_return': closed_df['cumulative_return'].iloc[-1],
             'avg_profit': avg_profit,
             'avg_loss': avg_loss,
             'max_drawdown': max_drawdown,
