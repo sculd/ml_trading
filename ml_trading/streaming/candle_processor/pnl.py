@@ -19,7 +19,7 @@ class Position:
     exit_timestamp: Optional[int] = None
     exit_price: Optional[float] = None
     exit_reason: Optional[str] = None  # 'tp', 'sl', 'timeout', or custom
-    pnl_pct: Optional[float] = None
+    pnl_return: Optional[float] = None
 
 class PNLMixin:
     def __init__(self, target_params: market_data.target.target.TargetParams = market_data.target.target.TargetParams()):
@@ -65,9 +65,9 @@ class PNLMixin:
         
         # Calculate P&L percentage based on side and prices
         if position.side == "long":
-            position.pnl_pct = (exit_price - position.entry_price) / position.entry_price
+            position.pnl_return = (exit_price - position.entry_price) / position.entry_price
         else:  # short
-            position.pnl_pct = (position.entry_price - exit_price) / position.entry_price
+            position.pnl_return = (position.entry_price - exit_price) / position.entry_price
         
         del self.active_positions[symbol]
         return position
@@ -98,8 +98,8 @@ class PNLMixin:
                 # If TP hit, use the TP price for exit
                 exit_price = position.entry_price * (1 + self.target_params.tp_value)
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "tp")
-                # Return the exact TP value as the pnl_pct
-                return {"position_changed": True, "reason": "tp", "pnl_pct": position.pnl_pct}
+                # Return the exact TP value as the pnl_return
+                return {"position_changed": True, "reason": "tp", "pnl_return": position.pnl_return}
             
             # Check stop loss using low price (worst case for longs)
             elif candle.low <= position.entry_price * (1 - self.target_params.sl_value):
@@ -107,7 +107,7 @@ class PNLMixin:
                 exit_price = position.entry_price * (1 - self.target_params.sl_value)
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "sl")
                 # Return the pnl percentage
-                return {"position_changed": True, "reason": "sl", "pnl_pct": position.pnl_pct}
+                return {"position_changed": True, "reason": "sl", "pnl_return": position.pnl_return}
                 
         else:  # short
             # Check take profit using low price (best case for shorts)
@@ -116,7 +116,7 @@ class PNLMixin:
                 exit_price = position.entry_price * (1 - self.target_params.tp_value)
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "tp")
                 # Return the pnl percentage
-                return {"position_changed": True, "reason": "tp", "pnl_pct": position.pnl_pct}
+                return {"position_changed": True, "reason": "tp", "pnl_return": position.pnl_return}
             
             # Check stop loss using high price (worst case for shorts)
             elif candle.high >= position.entry_price * (1 + self.target_params.sl_value):
@@ -124,13 +124,13 @@ class PNLMixin:
                 exit_price = position.entry_price * (1 + self.target_params.sl_value)
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "sl")
                 # Return the pnl percentage
-                return {"position_changed": True, "reason": "sl", "pnl_pct": position.pnl_pct}
+                return {"position_changed": True, "reason": "sl", "pnl_return": position.pnl_return}
             
         # Check timeout
         if (timestamp_epoch_seconds - position.entry_epoch_seconds) >= (self.target_params.forward_period * 60):
             # For timeout, use the current close price
             position = self.exit(symbol, timestamp_epoch_seconds, candle.close, "timeout")
-            return {"position_changed": True, "reason": "timeout", "pnl_pct": position.pnl_pct}
+            return {"position_changed": True, "reason": "timeout", "pnl_return": position.pnl_return}
             
         return {"position_changed": False}
 
@@ -155,7 +155,7 @@ class PNLMixin:
                 'entry_price': p.entry_price,
                 'exit_price': p.exit_price,
                 'exit_reason': p.exit_reason,
-                'pnl_pct': p.pnl_pct,
+                'pnl_return': p.pnl_return,
                 'duration_minutes': (p.exit_timestamp - p.entry_epoch_seconds) / 60 if p.exit_timestamp else None
             })
             
@@ -178,7 +178,7 @@ class PNLMixin:
                 'avg_loss': None,
                 'max_drawdown': None,
                 'sharpe_ratio': None,
-                'total_pnl_pct': 0,
+                'total_pnl_return': 0,
                 'active_positions': 0
             }
         
@@ -187,20 +187,20 @@ class PNLMixin:
         
         # Basic stats
         total_trades = len(closed_df)
-        winning_trades = closed_df[closed_df['pnl_pct'] > 0]
-        losing_trades = closed_df[closed_df['pnl_pct'] <= 0]
+        winning_trades = closed_df[closed_df['pnl_return'] > 0]
+        losing_trades = closed_df[closed_df['pnl_return'] <= 0]
         win_rate = len(winning_trades) / total_trades if total_trades > 0 else 0
         
         # PnL stats
-        avg_profit = winning_trades['pnl_pct'].mean() if len(winning_trades) > 0 else 0
-        avg_loss = losing_trades['pnl_pct'].mean() if len(losing_trades) > 0 else 0
-        profit_factor = abs(winning_trades['pnl_pct'].sum() / losing_trades['pnl_pct'].sum()) if len(losing_trades) > 0 and losing_trades['pnl_pct'].sum() != 0 else float('inf')
+        avg_profit = winning_trades['pnl_return'].mean() if len(winning_trades) > 0 else 0
+        avg_loss = losing_trades['pnl_return'].mean() if len(losing_trades) > 0 else 0
+        profit_factor = abs(winning_trades['pnl_return'].sum() / losing_trades['pnl_return'].sum()) if len(losing_trades) > 0 and losing_trades['pnl_return'].sum() != 0 else float('inf')
         
         # Calculate drawdown
         if not closed_df.empty:
             # Need to calculate dollar PnL for drawdown calculation
             closed_df['pnl_dollar'] = closed_df.apply(
-                lambda row: row['pnl_pct'] * row['entry_price'] * row['size'], 
+                lambda row: row['pnl_return'] * row['entry_price'] * row['size'], 
                 axis=1
             )
             
@@ -211,7 +211,7 @@ class PNLMixin:
             max_drawdown = closed_df['drawdown'].max()
             
             # Sharpe ratio (simplified)
-            returns = closed_df['pnl_pct']
+            returns = closed_df['pnl_return']
             sharpe_ratio = returns.mean() / returns.std() if returns.std() > 0 else 0
         else:
             max_drawdown = 0
@@ -228,7 +228,7 @@ class PNLMixin:
             'avg_loss': avg_loss,
             'max_drawdown': max_drawdown,
             'sharpe_ratio': sharpe_ratio,
-            'total_pnl_pct': closed_df['pnl_pct'].sum() if not closed_df.empty else 0,
+            'total_pnl_return': closed_df['pnl_return'].sum() if not closed_df.empty else 0,
             'exit_reasons': exit_reasons,
             'active_positions': len(self.active_positions)
         }
@@ -250,6 +250,6 @@ class PNLMixin:
         if closed_df.empty:
             return pd.DataFrame(columns=['timestamp', 'return'])
         
-        closed_df['return'] = closed_df['pnl_pct'].cumsum()
+        closed_df['return'] = closed_df['pnl_return'].cumsum()
         return closed_df[['timestamp', 'return']]
         

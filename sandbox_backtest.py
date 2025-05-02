@@ -38,7 +38,7 @@ model = ml_trading.models.non_sequential.xgboost_model.XGBoostModel.load("xgboos
 
 import ml_trading.streaming.candle_reader.backtest_csv
 csv_candle_reader = ml_trading.streaming.candle_reader.backtest_csv.CSVCandleReader(
-    history_filename='2024_03_13.parquet',
+    history_filename='2024_06_17.parquet',
     model=model,
 )
 
@@ -49,6 +49,9 @@ print(f'time taken: {t2 - t1} seconds')
 
 events_df = csv_candle_reader.candle_processor.get_events_df()
 print(events_df)
+
+import pprint
+pprint.pprint(csv_candle_reader.candle_processor.pnl.get_stats())
 
 print('done')
 

@@ -71,7 +71,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
     def on_new_minutes(self, symbol, timestamp_epoch_seconds):
         self._set_btc_symbol()
         result = super().on_new_minutes(symbol, timestamp_epoch_seconds)
-        candle = self.serieses[symbol].series[-1]
+        candle = self.serieses[symbol].series[-1][1]
         self.pnl.on_new_minutes(symbol, timestamp_epoch_seconds, candle)
 
         if not result['is_event'] or result['purged']:
@@ -127,7 +127,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         prediction = self.model.predict(features_df.values)
         print(f"{prediction=}")
 
-        candle = self.serieses[symbol].series[-1]
+        candle = self.serieses[symbol].series[-1][1]
         if prediction > self.threshold:
             print(f"Prediction {prediction} is greater than threshold {self.threshold}, buying {symbol}")
             self.pnl.enter(symbol, timestamp_epoch_seconds, 'long', candle.close)
