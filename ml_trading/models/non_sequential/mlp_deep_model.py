@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -74,9 +75,53 @@ class MLPModel(nn.Module):
         return y_pred
 
 
+class MLPDeepModel(ml_trading.models.model.Model):
+    def __init__(
+        self, 
+        model_name: str,
+        columns: List[str],
+        target: str,
+        mlp_model: MLPModel,
+        ):
+        super().__init__(model_name, columns, target)
+        self.mlp_model = mlp_model
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        return self.mlp_model.predict(X)
+    
+    def save(self, filename: str):
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
+        
+        # Save the XGBoost model
+        model_filename = f"{filename}.mlp"
+        self.mlp_model.save(model_filename)
+        print(f"Model saved to {model_filename}")
+        self.save_metadata(filename)
+
+    @classmethod
+    def load(cls, filename: str):
+        metadata = ml_trading.models.model.Model.load_metadata(filename)
+        # Load XGBoost model
+        model_filename = f"{filename}.mlp"
+        if not os.path.exists(model_filename):
+            raise FileNotFoundError(f"Model file not found: {model_filename}")
+            
+        mlp_model = torch.load(model_filename)
+        
+        # Create and return XGBoostModel instance
+        return cls(
+            model_name=metadata['model_name'],
+            columns=metadata['columns'],
+            target=metadata['target'],
+            mlp_model=mlp_model
+        )
+
+
 def _process_data(
     data_df: pd.DataFrame,
     target_column: str,
+    forward_return_column: str,
     scaler: Optional[StandardScaler] = None,
     fit_scaler: bool = False,
     use_scaler: bool = True
@@ -89,6 +134,8 @@ def _process_data(
     if 'symbol' in data_df.columns:
         data_df = data_df.drop('symbol', axis=1)
     
+    forward_return = data_df[forward_return_column].values
+
     # Drop all label_ columns except the target column
     label_columns = [col for col in data_df.columns if col.startswith('label_') and col != target_column]
     if label_columns:
@@ -121,13 +168,14 @@ def _process_data(
     X_scaled = X_scaled.astype(np.float32)
     y = y.astype(np.float32)
     
-    return X_scaled, y, scaler
+    return X_scaled, y, forward_return, scaler
 
 
 def train_mlp_model(
     train_df: pd.DataFrame,
     validation_df: pd.DataFrame,
     target_column: str,
+    forward_return_column: str,
     epochs: int = 100,
     batch_size: int = 64,
     hidden_layers: List[int] = [128, 64, 32],
@@ -147,8 +195,8 @@ def train_mlp_model(
     print(f"Using _device: {_device}")
     
     # Process data
-    X_train, y_train, scaler = _process_data(train_df, target_column, fit_scaler=True, use_scaler=use_scaler)
-    X_val, y_test, _ = _process_data(validation_df, target_column, scaler=scaler, use_scaler=use_scaler)
+    X_train, y_train, forward_return_train, scaler = _process_data(train_df, target_column, forward_return_column, fit_scaler=True, use_scaler=use_scaler)
+    X_val, y_test, forward_return_test, _ = _process_data(validation_df, target_column, forward_return_column, scaler=scaler, use_scaler=use_scaler)
     
     # Print label distribution
     print(f"\nTotal validation samples: {len(y_test)}")
@@ -272,10 +320,20 @@ def train_mlp_model(
     
     # Create results DataFrame
     validation_y_df = validation_df.copy()
+    validation_y_df['symbol'] = validation_df['symbol']
     validation_y_df['y'] = y_test
     validation_y_df['pred'] = y_pred
+    validation_y_df['forward_return'] = forward_return_test.values
+    validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
     
     # Calculate metrics
     metrics = ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold)
     
-    return model, metrics, validation_y_df
+    model_wrapped = MLPDeepModel(
+        model_name=f"mlp_deep_model",
+        columns=train_df.columns.tolist(),
+        target=target_column,
+        mlp_model=model
+    )
+    
+    return model_wrapped, metrics, validation_y_df

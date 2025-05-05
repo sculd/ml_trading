@@ -61,6 +61,7 @@ def train_xgboost_model(
     train_df: pd.DataFrame,
     validation_df: pd.DataFrame,
     target_column: str,
+    forward_return_column: str,
     test_size: float = 0.2,
     random_state: int = 42,
     xgb_params: Dict[str, Any] = None,
@@ -84,8 +85,8 @@ def train_xgboost_model(
     """
     # Drop the symbol column
 
-    X_train, y_train, _ = into_X_y(train_df, target_column, use_scaler=False)
-    X_test, y_test, _ = into_X_y(validation_df, target_column, use_scaler=False)
+    X_train, y_train, forward_return_train, _ = into_X_y(train_df, target_column, forward_return_column, use_scaler=False)
+    X_test, y_test, forward_return_test, _ = into_X_y(validation_df, target_column, forward_return_column, use_scaler=False)
     
     # Split into train and test sets
     '''
@@ -133,6 +134,7 @@ def train_xgboost_model(
     validation_y_df['symbol'] = validation_df['symbol']
     validation_y_df['y'] = y_test.values
     validation_y_df['pred'] = y_pred
+    validation_y_df['forward_return'] = forward_return_test.values
     validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
 
     model = XGBoostModel(

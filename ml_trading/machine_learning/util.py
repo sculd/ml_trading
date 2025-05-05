@@ -116,19 +116,6 @@ def calculate_trade_returns(result_df, threshold=0.70):
     result_df['trade_return'] = np.where((result_df['pred_decision'] < 0) & (result_df['y'] == -1), abs(result_df['pred_decision']), result_df['trade_return'])
     result_df['trade_return'] = np.where((result_df['pred_decision'] != 0) & (result_df['y'] != 0) & (result_df['pred_decision'] * result_df['y'] < 0), -np.abs(result_df['pred_decision']), result_df['trade_return'])
     
-    # Calculate some statistics
-    avg_return = result_df[result_df['pred_decision'] != 0]['trade_return'].mean()
-    total_trades = len(result_df[result_df['pred_decision'] != 0])
-    win_rate = len(result_df[result_df['trade_return'] > 0]) / total_trades if total_trades > 0 else 0
-    loss_rate = len(result_df[result_df['trade_return'] < 0]) / total_trades if total_trades > 0 else 0
-    draw_rate = len(result_df[(result_df['pred_decision'] != 0) & (result_df['y'] == 0)]) / total_trades if total_trades > 0 else 0
-    
-    print(f"\nTrade statistics (threshold={threshold}):")
-    print(f"Total trades: {total_trades}")
-    print(f"Average return per trade: {avg_return:.4f}")
-    print(f"Win rate: {win_rate:.2%}, loss: {loss_rate:.2%}, draw: {draw_rate:.2%}")
-    print(f"Total return: {result_df['trade_return'].sum():.4f}")
-    
     return result_df
 
 

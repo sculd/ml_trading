@@ -20,6 +20,7 @@ if torch.cuda.is_available():
 def into_X_y(
     df: pd.DataFrame,
     target_column: str,
+    forward_return_column: str,
     scaler: Optional[StandardScaler] = None,
     use_scaler: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, StandardScaler]:
@@ -39,6 +40,7 @@ def into_X_y(
     # Extract target
 
     df = df.drop('symbol', axis=1)
+    forward_return = df[forward_return_column]
     
     # Drop all label_ columns except the target column to prevent look-ahead bias
     label_columns = [col for col in df.columns if col.startswith('label_') and col != target_column]
@@ -60,4 +62,4 @@ def into_X_y(
         else:
             X = scaler.transform(X)
     
-    return X, y, scaler
+    return X, y, forward_return, scaler

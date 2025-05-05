@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 def into_X_y(
     df: pd.DataFrame,
     target_column: str,
+    forward_return_column: str,
     scaler: Optional[StandardScaler] = None,
     use_scaler: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, StandardScaler]:
@@ -28,8 +29,8 @@ def into_X_y(
         scaler: Fitted scaler
     """
     # Always get raw features from base function without scaling
-    X_raw, y, _ = ml_trading.models.util.into_X_y(df, target_column, scaler=None, use_scaler=False)
-    X_raw, y = X_raw.values, y.values
+    X_raw, y, forward_return, _ = ml_trading.models.util.into_X_y(df, target_column, forward_return_column, scaler=None, use_scaler=False)
+    X_raw, y, forward_return = X_raw.values, y.values, forward_return.values
     
     # Check if we need to extract sequences from complex objects
     # (where each cell in the DataFrame might contain an array/list)
@@ -87,4 +88,4 @@ def into_X_y(
     # Reshape target values to (samples, 1) for compatibility with deep learning models
     y = y.reshape(-1, 1)
     
-    return X, y, scaler
+    return X, y, forward_return, scaler

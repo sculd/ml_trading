@@ -45,16 +45,17 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         self.pnl = ml_trading.streaming.candle_processor.pnl.PNLMixin(target_params=target_params)
 
         """
-        ['symbol', 'return_1', 'return_5', 'return_15', 'return_30', 'return_60',
-        'return_120', 'volatility_5', 'volatility_10', 'volatility_20',
-        'volatility_30', 'volatility_60', 'bb_upper', 'bb_middle', 'bb_lower',
-        'bb_position', 'rsi', 'open_close_ratio', 'autocorr_lag1',
-        'hl_range_pct', 'close_zscore', 'close_minmax', 'obv_zscore',
-        'btc_return_1', 'btc_return_5', 'btc_return_15', 'btc_return_30',
-        'btc_return_60', 'btc_return_120', 'garch_volatility',
-        'label_forward_return_2m', 'label_forward_return_10m',
-        'label_long_tp30_sl30_2m', 'label_short_tp30_sl30_2m',
-        'label_long_tp30_sl30_10m', 'label_short_tp30_sl30_10m']
+        ['symbol', 'return_1', 'return_5', 'return_15', 'return_30', 'return_60', 
+        'return_120', 'volatility_5', 'volatility_10', 'volatility_20', 'volatility_30', 'volatility_60', 
+        'bb_upper', 'bb_middle', 'bb_lower', 'bb_position', 'bb_width', 
+        'rsi', 'open_close_ratio', 'autocorr_lag1', 'hl_range_pct', 'close_zscore', 'close_minmax', 
+        'ema_5', 'ema_rel_5', 'ema_15', 'ema_rel_15', 'ema_30', 
+        'ema_rel_30', 'ema_60', 'ema_rel_60', 'ema_120', 'ema_rel_120', 
+        'obv_pct_change', 'obv_zscore', 
+        'volume_ratio_20', 'volume_ratio_50', 'volume_ratio_100', 
+        'btc_return_1', 'btc_return_5', 'btc_return_15', 'btc_return_30', 'btc_return_60', 'btc_return_120', 
+        'garch_volatility', 
+        'label_forward_return_2m', 'label_forward_return_10m', 'label_long_tp30_sl30_2m', 'label_short_tp30_sl30_2m', 'label_long_tp30_sl30_10m', 'label_short_tp30_sl30_10m']
         """
 
     def _set_btc_symbol(self):
