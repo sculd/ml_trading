@@ -16,7 +16,8 @@ class CSVCandleReader:
         self.iterrows = self.df_prices_history.iterrows()
         self.history_read_i = 0
 
-        self.candle_processor_evt = ml_trading.streaming.candle_processor.cumsum_event.CumsumEventBasedProcessor(
+        # for debugging
+        self.candle_processor_ = ml_trading.streaming.candle_processor.cumsum_event.CumsumEventBasedProcessor(
             windows_size=60,
             resample_params=resample.ResampleParams(),
             purge_params=validation_data.PurgeParams(
@@ -80,6 +81,7 @@ class CSVCandleReader:
         epoch_seconds = candle['timestamp']
         if type(epoch_seconds) == pd.Timestamp:
             epoch_seconds = int(epoch_seconds.timestamp())
+
         self.candle_processor.on_candle(epoch_seconds, candle['symbol'], candle['open'], candle['high'], candle['low'], candle['close'], candle['volume'])
 
         if self.history_read_i % 10000 == 0:

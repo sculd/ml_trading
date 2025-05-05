@@ -26,6 +26,7 @@ class CandleProcessorBase:
         
         candle = OHLCVCandle(open_, high_, low_, close_, volume)
         result = self.serieses[symbol].on_candle(timestamp_epoch_seconds, candle)
+
         is_new_minute = result['is_new_minute']
 
         previous_latest_timestamp_epoch_seconds_truncated_daily = self.latest_timestamp_epoch_seconds_truncated_daily
@@ -35,7 +36,7 @@ class CandleProcessorBase:
 
         if is_new_minute:
             # process before adding new minute candle value to the series.
-            self.on_new_minutes(symbol, timestamp_epoch_seconds)
+            self.on_new_minutes(symbol, timestamp_epoch_seconds, candle)
             self.serieses[symbol].append(timestamp_epoch_seconds, candle)
 
     # override this
@@ -43,7 +44,7 @@ class CandleProcessorBase:
         return Series(self.windows_size)
 
     # override this
-    def on_new_minutes(self, symbol, timestamp_epoch_seconds):
+    def on_new_minutes(self, symbol, timestamp_epoch_seconds, candle):
         pass
 
 
@@ -58,6 +59,9 @@ class Series:
         self.latest_timestamp_epoch_seconds = 0
 
     def on_candle(self, timestamp_epoch_seconds, candle: OHLCVCandle):
+        if timestamp_epoch_seconds >= 1718674980:
+            timestamp_epoch_seconds = timestamp_epoch_seconds
+
         #print(f'on_candle {timestamp}, {symbol}, {open_}, {high_}, {low_}, {close_}, {volume}')
         is_new_minute = False
         if len(self.series) == 0:

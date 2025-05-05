@@ -68,9 +68,9 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         # Use the first matching BTC symbol found
         self.btc_symbol = btc_symbols[0]
 
-    def on_new_minutes(self, symbol, timestamp_epoch_seconds):
+    def on_new_minutes(self, symbol, timestamp_epoch_seconds, candle):
         self._set_btc_symbol()
-        result = super().on_new_minutes(symbol, timestamp_epoch_seconds)
+        result = super().on_new_minutes(symbol, timestamp_epoch_seconds, candle)
         # the candle in the parameter is the candle of the new minute 
         prev_minute_candle = self.serieses[symbol].series[-1][1]
         self.pnl.on_new_minutes(symbol, timestamp_epoch_seconds, prev_minute_candle)
@@ -78,9 +78,9 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         if not result['is_event'] or result['purged']:
             return
 
-        self.on_event(symbol, timestamp_epoch_seconds)
+        self.on_event(symbol, timestamp_epoch_seconds, candle)
 
-    def on_event(self, symbol, timestamp_epoch_seconds):
+    def on_event(self, symbol, timestamp_epoch_seconds, candle):
         ohlcv_df = self.serieses[symbol].to_pandas(symbol)
         if self.btc_symbol:
             ohlcv_btc_df = self.serieses[self.btc_symbol].to_pandas(self.btc_symbol)
@@ -107,6 +107,8 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
                 raise ValueError(f"Feature module {feature_label} does not have a calculate method")
 
             if feature_label == 'btc_features':
+                if ohlcv_btc_df is None:
+                    continue
                 feature_df = calculate_fn(pd.concat([ohlcv_df, ohlcv_btc_df]), feature_params)
             else:
                 feature_df = calculate_fn(ohlcv_df, feature_params)
@@ -128,13 +130,12 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         prediction = self.model.predict(features_df.values)
         print(f"{prediction=}")
 
-        candle = self.serieses[symbol].series[-1][1]
         if prediction > self.threshold:
             print(f"Prediction {prediction} is greater than threshold {self.threshold}, buying {symbol}")
-            self.pnl.enter(symbol, timestamp_epoch_seconds, 'long', candle.close)
+            self.pnl.enter(symbol, timestamp_epoch_seconds, 'long', (candle.open + candle.close) / 2)
         elif prediction < -self.threshold:
             print(f"Prediction {prediction} is less than threshold -{self.threshold}, selling {symbol}")
-            self.pnl.enter(symbol, timestamp_epoch_seconds, 'short', candle.close)
+            self.pnl.enter(symbol, timestamp_epoch_seconds, 'short', (candle.open + candle.close) / 2)
         else:
             print(f"Prediction {prediction} is between threshold {self.threshold} and -{self.threshold}, no action for {symbol}")
 

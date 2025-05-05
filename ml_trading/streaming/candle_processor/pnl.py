@@ -159,7 +159,7 @@ class PNLMixin:
                 'duration_minutes': (p.exit_epoch_seconds - p.entry_epoch_seconds) / 60 if p.exit_epoch_seconds else None
             })
             
-        return pd.DataFrame(data).set_index(['entry_timestamp', 'symbol'])
+        return pd.DataFrame(data).set_index(['entry_timestamp', 'symbol']).sort_index()
     
     def get_stats(self) -> Dict[str, Any]:
         """
