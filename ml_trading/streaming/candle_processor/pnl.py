@@ -72,13 +72,13 @@ class PNLMixin:
         del self.active_positions[symbol]
         return position
     
-    def on_new_minutes(self, symbol: str, timestamp_epoch_seconds: int, candle: base.OHLCVCandle):
+    def on_new_minutes(self, symbol: str, timestamp_epoch_seconds: int, prev_minute_candle: base.OHLCVCandle):
         """
         Returns:
             Dict with info about any position changes
         """
         # Store latest candle
-        self.latest_candles[symbol] = candle
+        self.latest_candles[symbol] = prev_minute_candle
         
         if symbol not in self.active_positions:
             return {"position_changed": False}
@@ -94,7 +94,7 @@ class PNLMixin:
         
         if position.side == "long":
             # Check take profit using high price (best case for longs)
-            if candle.high >= position.entry_price * (1 + self.target_params.tp_value):
+            if prev_minute_candle.high >= position.entry_price * (1 + self.target_params.tp_value):
                 # If TP hit, use the TP price for exit
                 exit_price = position.entry_price * (1 + self.target_params.tp_value)
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "tp")
@@ -102,7 +102,7 @@ class PNLMixin:
                 return {"position_changed": True, "reason": "tp", "pnl_return": position.pnl_return}
             
             # Check stop loss using low price (worst case for longs)
-            elif candle.low <= position.entry_price * (1 - self.target_params.sl_value):
+            elif prev_minute_candle.low <= position.entry_price * (1 - self.target_params.sl_value):
                 # If SL hit, use the SL price for exit
                 exit_price = position.entry_price * (1 - self.target_params.sl_value)
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "sl")
@@ -111,7 +111,7 @@ class PNLMixin:
                 
         else:  # short
             # Check take profit using low price (best case for shorts)
-            if candle.low <= position.entry_price * (1 - self.target_params.tp_value):
+            if prev_minute_candle.low <= position.entry_price * (1 - self.target_params.tp_value):
                 # If TP hit, use the TP price for exit
                 exit_price = position.entry_price * (1 - self.target_params.tp_value)
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "tp")
@@ -119,7 +119,7 @@ class PNLMixin:
                 return {"position_changed": True, "reason": "tp", "pnl_return": position.pnl_return}
             
             # Check stop loss using high price (worst case for shorts)
-            elif candle.high >= position.entry_price * (1 + self.target_params.sl_value):
+            elif prev_minute_candle.high >= position.entry_price * (1 + self.target_params.sl_value):
                 # If SL hit, use the SL price for exit
                 exit_price = position.entry_price * (1 + self.target_params.sl_value)
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "sl")
@@ -129,7 +129,7 @@ class PNLMixin:
         # Check timeout
         if (timestamp_epoch_seconds - position.entry_epoch_seconds) >= (self.target_params.forward_period * 60):
             # For timeout, use the current close price
-            position = self.exit(symbol, timestamp_epoch_seconds, candle.close, "timeout")
+            position = self.exit(symbol, timestamp_epoch_seconds, prev_minute_candle.close, "timeout")
             return {"position_changed": True, "reason": "timeout", "pnl_return": position.pnl_return}
             
         return {"position_changed": False}

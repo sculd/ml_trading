@@ -71,8 +71,9 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
     def on_new_minutes(self, symbol, timestamp_epoch_seconds):
         self._set_btc_symbol()
         result = super().on_new_minutes(symbol, timestamp_epoch_seconds)
-        candle = self.serieses[symbol].series[-1][1]
-        self.pnl.on_new_minutes(symbol, timestamp_epoch_seconds, candle)
+        # the candle in the parameter is the candle of the new minute 
+        prev_minute_candle = self.serieses[symbol].series[-1][1]
+        self.pnl.on_new_minutes(symbol, timestamp_epoch_seconds, prev_minute_candle)
 
         if not result['is_event'] or result['purged']:
             return
