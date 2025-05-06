@@ -3,9 +3,7 @@ import argparse
 import asyncio
 import logging
 import signal
-import setup_env
-import ssl
-import os
+import setup_env # needed for the environment variables
 import ml_trading.live_trading.trade_execution.execution_okx
 from ml_trading.streaming.candle_reader.live_okx_native import LiveOkxStreamReader, LiveOkxStreamReaderParams
 
