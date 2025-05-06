@@ -10,10 +10,6 @@ from ml_trading.streaming.candle_reader.live_okx_native import LiveOkxStreamRead
 def main():
     """
     Main function for the trading application.
-    
-    Command line arguments:
-    --dryrun: Run in dryrun mode
-    --leverage <v>: Set leverage level
     """
     parser = argparse.ArgumentParser(description='ML Trading Application')
     parser.add_argument('--betsize', type=float, default=100.0, help='Set target bet size')
