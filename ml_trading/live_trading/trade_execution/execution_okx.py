@@ -1,5 +1,6 @@
 import logging, os, requests
 from collections import defaultdict
+from dataclasses import dataclass
 import ml_trading.live_trading.publish.telegram
 
 _flag = "0"  # live trading: 0, demo trading: 1
@@ -43,14 +44,21 @@ def get_current_price(symbol):
     return price
 
 
+@dataclass
+class OkxTradeExecutionParams:
+    target_betsize: float
+    leverage: float
+    is_dry_run: bool = False
+
+
 class TradeExecution:
-    def __init__(self, target_betsize, leverage):
-        self.target_betsize = target_betsize
-        self.leverage = leverage
+    def __init__(self, param: OkxTradeExecutionParams):
+        self.target_betsize = param.target_betsize
+        self.leverage = param.leverage
         self.direction_per_symbol = defaultdict(int)
         self.init_inst_data()
         self.close_open_positions()
-        self.is_dry_run = False
+        self.is_dry_run = param.is_dry_run
 
     def enable_dry_run(self, enable=True):
         self.is_dry_run = enable

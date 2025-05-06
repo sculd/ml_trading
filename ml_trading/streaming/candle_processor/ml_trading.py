@@ -28,6 +28,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
             model: Optional[ml_trading.models.model.Model] = None,
             threshold: float = 0.5,
             target_params: market_data.target.target.TargetParams = market_data.target.target.TargetParams(),
+            live_trade_execution = None,
             ):
         if model is not None:
             self.feature_labels_params = market_data.feature.registry.find_feature_params_for_columns(model.columns)
@@ -42,7 +43,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         self.target_params = target_params
         self.btc_symbol = None
 
-        self.pnl = ml_trading.streaming.candle_processor.pnl.PNLMixin(target_params=target_params)
+        self.pnl = ml_trading.streaming.candle_processor.pnl.PNLMixin(target_params=target_params, live_trade_execution=live_trade_execution)
 
         """
         ['symbol', 'return_1', 'return_5', 'return_15', 'return_30', 'return_60', 
