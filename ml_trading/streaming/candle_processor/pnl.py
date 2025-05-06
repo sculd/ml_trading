@@ -22,12 +22,17 @@ class Position:
     pnl_return: Optional[float] = None
 
 class PNLMixin:
-    def __init__(self, target_params: market_data.target.target.TargetParams = market_data.target.target.TargetParams()):
+    def __init__(
+            self, 
+            target_params: market_data.target.target.TargetParams = market_data.target.target.TargetParams(),
+            live_trade_execution = None,
+            ):
         self.target_params = target_params
         self.positions: List[Position] = []
         self.active_positions: Dict[str, Position] = {}  # Symbol -> Position
         self.latest_candles: Dict[str, base.OHLCVCandle] = {}  # Symbol -> OHLCVCandle
-        
+        self.live_trade_execution = live_trade_execution
+
     def enter(self, symbol: str, timestamp_epoch_seconds: int, side: str, entry_price: float, size: float = 1.0):
         """
         Returns:
@@ -47,6 +52,9 @@ class PNLMixin:
         
         self.positions.append(position)
         self.active_positions[symbol] = position
+        if self.live_trade_execution:
+            self.live_trade_execution.enter(symbol, timestamp_epoch_seconds, 1 if side == 'long' else -1)
+
         return position
         
     def exit(self, symbol: str, timestamp_epoch_seconds: int, exit_price: float, reason: str = "manual"):
@@ -70,6 +78,10 @@ class PNLMixin:
             position.pnl_return = (position.entry_price - exit_price) / position.entry_price
         
         del self.active_positions[symbol]
+
+        if self.live_trade_execution:
+            self.live_trade_execution.exit(symbol, timestamp_epoch_seconds)
+
         return position
     
     def on_new_minutes(self, symbol: str, timestamp_epoch_seconds: int, prev_minute_candle: base.OHLCVCandle):

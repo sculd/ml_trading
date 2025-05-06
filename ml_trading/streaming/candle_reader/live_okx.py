@@ -4,6 +4,9 @@ import websocket, ssl
 import ml_trading.live_trading.util.symbols_okx
 from collections import defaultdict, deque
 import ml_trading.streaming.candle_processor.base
+import market_data.machine_learning.resample as resample
+import ml_trading.machine_learning.validation_data as validation_data
+import ml_trading.streaming.candle_processor.ml_trading
 import pytz
 from threading import Thread
 
@@ -49,11 +52,16 @@ def _message_to_bwt_dicts(symbol, data):
 
 _msg_cnt = 0
 
-class PriceCache:
-    def __init__(self, trading_managers):
-        window = max([trading_manager.trading_param.feature_param.window for trading_manager in trading_managers])
-        self.candle_cache = ml_trading.streaming.candle.CandleProcessorBase(trading_managers, windows_minutes=window)
-
+class LiveOkxStreamReader:
+    def __init__(self, model: ml_trading.models.model.Model = None):
+        self.candle_processor = ml_trading.streaming.candle_processor.ml_trading.MLTradingProcessor(
+            resample_params=resample.ResampleParams(),
+            purge_params=validation_data.PurgeParams(
+                purge_period=datetime.timedelta(minutes=30)
+            ),
+            model=model,
+            threshold=0.7,
+        )
         self.ws_connect()
 
     def ws_connect(self):
@@ -96,7 +104,7 @@ class PriceCache:
         bwt_dicts = _message_to_bwt_dicts(symbol, msg_data)
 
         for bwt_dict in bwt_dicts:
-            self.candle_cache.on_candle(bwt_dict['epoch_seconds'], bwt_dict['symbol'], bwt_dict['open'], bwt_dict['high'], bwt_dict['low'], bwt_dict['close'], bwt_dict['volume'])
+            self.candle_processor.on_candle(bwt_dict['epoch_seconds'], bwt_dict['symbol'], bwt_dict['open'], bwt_dict['high'], bwt_dict['low'], bwt_dict['close'], bwt_dict['volume'])
 
     def on_ws_error(self, ws, err):
         logging.debug(f'Got an ws error:\n{err}\nClosing the connection.')

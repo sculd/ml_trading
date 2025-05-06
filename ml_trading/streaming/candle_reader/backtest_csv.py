@@ -2,6 +2,7 @@ import pandas as pd, numpy as np
 import datetime, time
 import os
 from collections import defaultdict, deque
+import ml_trading.models.model
 import ml_trading.streaming.candle_processor.base
 import ml_trading.streaming.candle_processor.cumsum_event
 import ml_trading.streaming.candle_processor.ml_trading
@@ -11,7 +12,7 @@ import logging
 
 
 class CSVCandleReader:
-    def __init__(self, history_filename, model = None):
+    def __init__(self, history_filename, model: ml_trading.models.model.Model = None):
         self.df_prices_history = self._read_file(history_filename)
         self.iterrows = self.df_prices_history.iterrows()
         self.history_read_i = 0

@@ -1,7 +1,6 @@
 import logging, os, requests
-import trading.execution
 from collections import defaultdict
-import publish.telegram
+import ml_trading.live_trading.publish.telegram
 
 _flag = "0"  # live trading: 0, demo trading: 1
 _api_key = os.environ['OKX_API_KEY']
@@ -49,9 +48,6 @@ class TradeExecution:
         self.target_betsize = target_betsize
         self.leverage = leverage
         self.direction_per_symbol = defaultdict(int)
-        self.execution_records = trading.execution.ExecutionRecords()
-        self.closed_execution_records_per_symbol = defaultdict(trading.execution.ClosedExecutionRecords)
-        self.closed_execution_records = trading.execution.ClosedExecutionRecords()
         self.init_inst_data()
         self.close_open_positions()
         self.is_dry_run = False
@@ -97,6 +93,7 @@ class TradeExecution:
         '''
         negative weight meaning short-selling.
 
+        side: +1 for long, -1 for short
         direction: +1 for enter, -1 for leave.
         '''
         if direction == 1:
@@ -109,14 +106,13 @@ class TradeExecution:
         negative weight meaning short-selling.
 
         side: +1 for long, -1 for short
-        direction: +1 for enter, -1 for leave.
         '''
         direction = 1
         price = get_current_price(symbol)
 
         message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, self.direction: {self.direction_per_symbol[symbol]}'
         logging.info(message)
-        publish.telegram.post_message(message)
+        ml_trading.live_trading.publish.telegram.post_message(message)
 
         if self.direction_per_symbol[symbol] == 1:
             return
@@ -132,9 +128,6 @@ class TradeExecution:
         sz = int(sz_target_leveraged)
 
         logging.info(f'for {symbol}, target sz: {sz_target}, actual sz: {sz} (leveraged by {self.leverage}), delta: {sz - sz_target}, contract_val: {contract_val}')
-
-        record = trading.execution.ExecutionRecord(epoch_seconds, symbol, price, sz, side, direction)
-        self.execution_records.append_record(record)
 
         if self.is_dry_run:
             logging.info("in dryrun mode, not actually make the order requests.")
@@ -154,8 +147,6 @@ class TradeExecution:
             else:
                 logging.error(f'Unsuccessful order request, error_code = {result["data"][0]["sCode"]}, Error_message = {result["data"][0]["sMsg"]}')
 
-        self.closed_execution_records_per_symbol[symbol].enter(record)
-        self.closed_execution_records.enter(record)
         self.direction_per_symbol[symbol] = 1
 
     def exit(self, symbol, epoch_seconds):
@@ -163,13 +154,12 @@ class TradeExecution:
         negative weight meaning short-selling.
 
         side: +1 for long, -1 for short
-        direction: +1 for enter, -1 for leave.
         '''
         direction = -1
         price = get_current_price(symbol)
         message = f'[exit] at {epoch_seconds}, for {symbol}, prices: {price}, direction: exit, self.direction: {self.direction_per_symbol[symbol]}'
         logging.info(message)
-        publish.telegram.post_message(message)
+        ml_trading.live_trading.publish.telegram.post_message(message)
 
         if self.direction_per_symbol[symbol] != 1:
             return
@@ -202,19 +192,10 @@ class TradeExecution:
                 logging.error(f"Unsuccessful order request {result}")
 
         side = 1 if position_data['posSide'] == 'long' else -1
-        record = trading.execution.ExecutionRecord(epoch_seconds, symbol, price, 0, side, direction)
-        self.execution_records.append_record(record)
-        closed_record = trading.execution.ClosedExecutionRecord(self.closed_execution_records_per_symbol[symbol].enter_record, record)
-        self.closed_execution_records_per_symbol[symbol].closed_records.append(closed_record)
-        self.closed_execution_records.closed_records.append(closed_record)
-        message = f'at {epoch_seconds}, for {symbol}, closed: {closed_record}, trades pairs: {len(self.closed_execution_records.closed_records)}, cum_pnl: {self.closed_execution_records.get_cum_pnl()}'
-        logging.info(message)
-        publish.telegram.post_message(message)
+        message = f'at {epoch_seconds}, for {symbol}'
+        ml_trading.live_trading.publish.telegram.post_message(message)
 
         self.direction_per_symbol[symbol] = direction
 
     def print(self):
         logging.info(f'[Okx TradeExecution] betsize: {self.target_betsize}')
-        self.execution_records.print()
-        self.closed_execution_records.print()
-        logging.info(f'closed trades pairs: {len(self.closed_execution_records.closed_records)}, cum_pnl: {self.closed_execution_records.get_cum_pnl()}')

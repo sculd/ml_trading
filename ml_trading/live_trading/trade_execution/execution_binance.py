@@ -1,5 +1,4 @@
 import logging, os, requests
-import trading.execution
 from collections import defaultdict
 import publish.telegram
 import util.binance
@@ -12,8 +11,6 @@ class TradeExecution:
         self.target_betsize = target_betsize
         self.leverage = leverage
         self.direction_per_symbol = defaultdict(int)
-        self.execution_records = trading.execution.ExecutionRecords()
-        self.closed_execution_records = trading.execution.ClosedExecutionRecords()
         self.init_inst_data()
         self.close_open_positions()
 
@@ -103,7 +100,6 @@ class TradeExecution:
         logging.info(f'for {symbol}, target sz: {sz_target}, actual sz: {sz}, delta: {sz - sz_target}, lot_size: {lot_size}')
 
         record = trading.execution.ExecutionRecord(epoch_seconds, symbol, price, sz, side, direction)
-        self.execution_records.append_record(record)
 
         side_str = 'BUY' if side > 0 else 'SELL'
         close_result = self.client.futures_create_order(
@@ -112,8 +108,6 @@ class TradeExecution:
         if close_result is not None:
             logging.info(close_result)
 
-        self.closed_execution_records.enter(record)
-        
         self.direction_per_symbol[symbol] = 1
 
     def exit(self, symbol, epoch_seconds, price):
@@ -147,11 +141,8 @@ class TradeExecution:
         self.close_open_position(position_data)
         
         side = 1 if position_amount > 0 else -1
-        record = trading.execution.ExecutionRecord(epoch_seconds, symbol, price, 0, side, direction)
-        self.execution_records.append_record(record)
-        closed_record = trading.execution.ClosedExecutionRecord(self.closed_execution_records.enter_record, record)
-        self.closed_execution_records.closed_records.append(closed_record)
-        message = f'at {epoch_seconds}, for {symbol}, closed: {closed_record}, trades pairs: {len(self.closed_execution_records.closed_records)}, cum_pnl: {self.closed_execution_records.get_cum_pnl()}'
+
+        message = f'at {epoch_seconds}, for {symbol}'
         logging.info(message)
         publish.telegram.post_message(message)
 
@@ -159,6 +150,3 @@ class TradeExecution:
 
     def print(self):
         logging.info(f'[Okx TradeExecution] betsize: {self.target_betsize}')
-        self.execution_records.print()
-        self.closed_execution_records.print()
-        logging.info(f'closed trades pairs: {len(self.closed_execution_records.closed_records)}, cum_pnl: {self.closed_execution_records.get_cum_pnl()}')

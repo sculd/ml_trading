@@ -323,7 +323,7 @@ def train_mlp_model(
     validation_y_df['symbol'] = validation_df['symbol']
     validation_y_df['y'] = y_test
     validation_y_df['pred'] = y_pred
-    validation_y_df['forward_return'] = forward_return_test.values
+    validation_y_df['forward_return'] = forward_return_test
     validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
     
     # Calculate metrics

@@ -234,14 +234,6 @@ def create_split_moving_forward(
         resample_params=resample_params,
         seq_params=seq_params,
     )
-    label_columns = [c for c in ml_data.columns if 'label' in c]
-    return_columns = [c for c in ml_data.columns if c.startswith('return_')]
-    btc_return_columns = [c for c in ml_data.columns if c.startswith('btc_return_')]
-    volatility_columns = [c for c in ml_data.columns if c.startswith('volatility_')]
-    obv_columns = [c for c in ml_data.columns if c.startswith('obv_')]
-    bb_columns = [c for c in ml_data.columns if c.startswith('bb_')]
-    ema_columns = [c for c in ml_data.columns if 'ema' in c]
-    volume_ratio_columns = [c for c in ml_data.columns if 'volume_ratio' in c]
     #ml_data = ml_data.drop(columns=ema_columns + volume_ratio_columns + ['bb_width', 'obv_pct_change'])
 
     ml_data = _purge(ml_data, purge_params)
