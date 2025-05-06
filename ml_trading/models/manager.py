@@ -64,11 +64,6 @@ class ModelManager:
             
         Returns:
             bool: True if upload successful, False otherwise
-            
-        Example:
-            manager = ModelManager()
-            model = MyTrainedModel()  # A subclass of ml_trading.models.model.Model
-            success = manager.upload_model(model, "xgboost/btc_1h")
         """
         try:
             # Ensure the model path doesn't start with a slash
@@ -157,13 +152,9 @@ class ModelManager:
                 logging.info(f"Downloaded {blob.name} to {local_file_path}")
             
             # Try to load the model using model_class.load
-            try:
-                model = model_class.load(local_model_base)
-                logging.info(f"Model successfully loaded using {model_class.__name__}.load()")
-                return model
-            except Exception as e:
-                logging.error(f"Could not load model using {model_class.__name__}.load(): {str(e)}")
-                return None
+            model = model_class.load(local_model_base)
+            logging.info(f"Model successfully loaded using {model_class.__name__}.load()")
+            return model
             
         except Exception as e:
             logging.error(f"Error downloading model from GCS: {str(e)}")
