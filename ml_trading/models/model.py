@@ -23,9 +23,9 @@ class Model:
             f"{len(self.columns)} columns:\n{self.columns}\n"+\
             f"target: {self.target}"
 
-    def save_metadata(self, filename: str):
+    def save_metadata(self, model_id: str):
         # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
+        os.makedirs(os.path.dirname(os.path.abspath(model_id)), exist_ok=True)
         
         # Save metadata (model name, columns, target)
         metadata = {
@@ -34,16 +34,16 @@ class Model:
             'target': self.target
         }
         
-        metadata_filename = f"{filename}.meta.json"
+        metadata_filename = f"{model_id}.meta.json"
         with open(metadata_filename, 'w') as f:
             json.dump(metadata, f)
             
         print(f"Metadata saved to {metadata_filename}")
 
     @classmethod
-    def load_metadata(cls, filename: str):
+    def load_metadata(cls, model_id: str):
         # Load metadata
-        metadata_filename = f"{filename}.meta.json"
+        metadata_filename = f"{model_id}.meta.json"
         if not os.path.exists(metadata_filename):
             raise FileNotFoundError(f"Metadata file not found: {metadata_filename}")
             

@@ -10,8 +10,9 @@ import ml_trading.models.model
 import os
 import json
 import pickle
+from ml_trading.models.registry import register_model
 
-
+@register_model("xgboost_model")
 class XGBoostModel(ml_trading.models.model.Model):
     def __init__(
         self, 
@@ -26,21 +27,21 @@ class XGBoostModel(ml_trading.models.model.Model):
     def predict(self, X: np.ndarray) -> np.ndarray:
         return self.xgb_model.predict(X)
     
-    def save(self, filename: str):
+    def save(self, model_id: str):
         # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
+        os.makedirs(os.path.dirname(os.path.abspath(model_id)), exist_ok=True)
         
         # Save the XGBoost model
-        model_filename = f"{filename}.xgb"
+        model_filename = f"{model_id}.xgb"
         self.xgb_model.save_model(model_filename)
         print(f"Model saved to {model_filename}")
-        self.save_metadata(filename)
+        self.save_metadata(model_id)
 
     @classmethod
-    def load(cls, filename: str):
-        metadata = ml_trading.models.model.Model.load_metadata(filename)
+    def load(cls, model_id: str):
+        metadata = ml_trading.models.model.Model.load_metadata(model_id)
         # Load XGBoost model
-        model_filename = f"{filename}.xgb"
+        model_filename = f"{model_id}.xgb"
         if not os.path.exists(model_filename):
             raise FileNotFoundError(f"Model file not found: {model_filename}")
             
