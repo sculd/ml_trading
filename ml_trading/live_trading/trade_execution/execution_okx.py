@@ -199,10 +199,6 @@ class TradeExecution:
             else:
                 logging.error(f"Unsuccessful order request {result}")
 
-        side = 1 if position_data['posSide'] == 'long' else -1
-        message = f'at {epoch_seconds}, for {symbol}'
-        ml_trading.live_trading.publish.telegram.post_message(message)
-
         self.direction_per_symbol[symbol] = direction
 
     def print(self):
