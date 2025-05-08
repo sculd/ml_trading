@@ -6,3 +6,8 @@ numpy
 pytorch
 hmmlearn
 google-cloud-storage
+dotenv
+scikit-learn
+hmmlearn
+tqdm
+xgboost
