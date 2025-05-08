@@ -16,6 +16,8 @@ import logging
 # Import the Model class directly
 from ml_trading.models.model import Model as MLTradingModel
 
+LOCAL_MODEL_DIR_BASE = "saved_models"
+
 # Default Google Cloud Storage bucket name
 _bucket_name = "ml_trading"
 
@@ -29,7 +31,7 @@ class ModelManager:
     - Provides utility functions for listing and deleting models
     - Handles serialization and deserialization using model's built-in methods
     """
-    def __init__(self, bucket_name: str = _bucket_name, local_model_dir_base: str = "saved_models"):
+    def __init__(self, bucket_name: str = _bucket_name, local_model_dir_base: str = LOCAL_MODEL_DIR_BASE):
         """
         Initialize the ModelManager.
         

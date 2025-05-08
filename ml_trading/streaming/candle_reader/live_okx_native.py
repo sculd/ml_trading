@@ -15,11 +15,13 @@ import ml_trading.machine_learning.validation_data as validation_data
 import ml_trading.streaming.candle_processor.ml_trading
 import ml_trading.live_trading.trade_execution.execution_okx
 import ml_trading.live_trading.util.symbols_okx
+import ml_trading.models.updater
 
 _ws_address = "wss://ws.okx.com:8443/ws/v5/business"
 
 _ping_interval_seconds = 15  # seconds
 _pong_timeout_seconds = 30   # seconds
+_model_check_interval = 300  # Check for model updates every 5 minutes
 
 @dataclass
 class LiveOkxStreamReaderParams:
@@ -65,8 +67,19 @@ class LiveOkxStreamReader:
     def __init__(
             self, 
             okx_trade_execution_params: ml_trading.live_trading.trade_execution.execution_okx.OkxTradeExecutionParams,
-            model: ml_trading.models.model.Model = None,
+            updater_params: ml_trading.models.updater.ModelUpdaterParams = None,
             reader_params: LiveOkxStreamReaderParams = None):
+        self.reader_params = reader_params or LiveOkxStreamReaderParams()
+        
+        model = None
+        # Initialize model updater if model is not provided
+        self.model_updater = None
+        if updater_params is not None:
+            self.model_updater = ml_trading.models.updater.ModelUpdater(
+                model_id=updater_params.model_id,
+            )
+            model = self.model_updater.model
+            
         okx_live_trade_execution = ml_trading.live_trading.trade_execution.execution_okx.TradeExecution(okx_trade_execution_params)
         self.candle_processor = ml_trading.streaming.candle_processor.ml_trading.MLTradingProcessor(
             resample_params=resample.ResampleParams(),
@@ -80,8 +93,8 @@ class LiveOkxStreamReader:
         self.ws = None
         self.last_pong_time = None
         self.should_run = True
-        self.reader_params = reader_params or LiveOkxStreamReaderParams()
         self.last_pong_time = time.time()
+        self.model_updater_task = None
 
     async def connect(self):
         while self.should_run:
@@ -110,14 +123,48 @@ class LiveOkxStreamReader:
                     await websocket.send(json.dumps(subscribe_message))
                     logging.info(f"Subscribed to {len(symbols)} symbols")
 
-                    # Handle ping/pong and messages
+                    # Start tasks for ping/pong and model updates
                     ping_sender = asyncio.create_task(self.send_ping())
+                    
+                    # Start model updater task if model updater exists
+                    if self.model_updater:
+                        self.model_updater_task = asyncio.create_task(self.check_model_updates())
+                    
+                    # Handle messages
                     await self.handle_messages()
+                    
+                    # Cancel tasks when connection is closed
                     ping_sender.cancel()
+                    if self.model_updater_task:
+                        self.model_updater_task.cancel()
                     
             except Exception as e:
                 logging.error(f"WebSocket connection failed: {e}")
                 await asyncio.sleep(5)  # Backoff before reconnect
+
+    async def check_model_updates(self):
+        """Task to periodically check for model updates."""
+        logging.info("Starting model updater task")
+        while True:
+            try:
+                await asyncio.sleep(_model_check_interval)
+                logging.debug("Checking for model updates")
+                
+                if self.model_updater.check_for_updates():
+                    # Update the model in the candle processor
+                    new_model = self.model_updater.model
+                    if new_model:
+                        logging.info("Updating model in candle processor")
+                        self.candle_processor.model = new_model
+                        logging.info("Model successfully updated in live trading system")
+                    else:
+                        logging.warning("Model updater returned True but no model is available")
+            except asyncio.CancelledError:
+                logging.info("Model updater task cancelled")
+                break
+            except Exception as e:
+                logging.error(f"Error in model updater task: {e}")
+                # Don't break the loop for other exceptions, keep trying
 
     async def handle_messages(self):
         async for message in self.ws:
