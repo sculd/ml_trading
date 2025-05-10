@@ -97,7 +97,7 @@ def create_train_validation_test_splits(
     purge_params: PurgeParams = PurgeParams(),
     embargo_period: datetime.timedelta = datetime.timedelta(days=1),
     window_type: str = 'fixed',  # 'fixed' or 'expanding'
-    fixed_window_size: datetime.timedelta = datetime.timedelta(days=10),
+    fixed_window_size: datetime.timedelta = datetime.timedelta(days=100),
     step_size: datetime.timedelta = datetime.timedelta(days=5),
     split_ratio: List[float] = [0.7, 0.2, 0.1]
 ) -> List[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
@@ -137,8 +137,7 @@ def create_train_validation_test_splits(
         export_mode=export_mode,
         aggregation_mode=aggregation_mode,
         time_range=time_range,
-        feature_params=feature_params,
-        target_params=target_params,
+        target_params_batch=target_params,
         resample_params=resample_params,
         seq_params=seq_params,
     )
@@ -187,8 +186,8 @@ def create_split_moving_forward(
     purge_params: PurgeParams = PurgeParams(),
     embargo_period: datetime.timedelta = datetime.timedelta(days=1),
     window_type: str = 'fixed',  # 'fixed' or 'expanding'
-    initial_training_fixed_window_size: datetime.timedelta = datetime.timedelta(days=10),
-    step_event_size: int = 1000,
+    initial_training_fixed_window_size: datetime.timedelta = datetime.timedelta(days=100),
+    step_event_size: int = 500,
     validation_fixed_event_size: int = 300,
     test_fixed_event_size: int = 150,
 ) -> List[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
