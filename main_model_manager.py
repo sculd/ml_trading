@@ -42,7 +42,7 @@ def main():
         # Handle upload action
         print(f"Performing upload action")
         if not args.model_id:
-            print("Error: For upload action, --model is required")
+            print("Error: For upload action, --model_id is required")
             return
         # Implementation for model upload
         # You would need to create and train a model first
@@ -52,7 +52,7 @@ def main():
         # Handle download action
         print(f"Performing download action")
         if not args.model_id:
-            print("Error: For download action,  --model is required")
+            print("Error: For download action,  --model_id is required")
             return
         # Download model using the specified model class
         model_manager.download_model(args.model_id, model_class)
@@ -61,7 +61,7 @@ def main():
         # Handle train action
         print(f"Performing train action")
         if not args.model_id:
-            print("Error: For train action, --model is required")
+            print("Error: For train action, --model_id is required")
             return
         # Implementation for model training
         # You would train the model here and potentially save it
@@ -71,7 +71,4 @@ def main():
 
 
 if __name__ == "__main__":
-    #model_manager = ml_trading.models.manager.ModelManager()
-    #model_class = ml_trading.models.registry.get_model_by_label("xgboost_model")
-    #model_manager.download_model("xgboost_model", model_class)
     main() 
