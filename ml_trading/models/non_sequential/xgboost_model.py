@@ -58,23 +58,18 @@ class XGBoostModel(ml_trading.models.model.Model):
 
 
 def train_xgboost_model(
-    #data_df: pd.DataFrame,
     train_df: pd.DataFrame,
-    validation_df: pd.DataFrame,
     target_column: str,
     forward_return_column: str,
-    test_size: float = 0.2,
     random_state: int = 42,
     xgb_params: Dict[str, Any] = None,
-    prediction_threshold: float = 0.5
-) -> Tuple[xgb.XGBRegressor, Dict[str, float]]:
+) -> xgb.XGBRegressor:
     """
     Train an XGBoost model on the provided data.
     
     Args:
         data_df: DataFrame containing features and target
         target_column: Name of the target column to predict
-        test_size: Proportion of data to use for testing
         random_state: Random seed for reproducibility
         xgb_params: Dictionary of XGBoost parameters. If None, uses default parameters
         prediction_threshold: Threshold for determining neutral predictions. Values between -threshold and +threshold are considered neutral.
@@ -87,7 +82,6 @@ def train_xgboost_model(
     # Drop the symbol column
 
     X_train, y_train, forward_return_train, _ = into_X_y(train_df, target_column, forward_return_column, use_scaler=False)
-    X_test, y_test, forward_return_test, _ = into_X_y(validation_df, target_column, forward_return_column, use_scaler=False)
     
     # Split into train and test sets
     '''
@@ -100,10 +94,10 @@ def train_xgboost_model(
     
     # Print target label distribution in test set
     print("\nTest set target label distribution:")
-    total_samples = len(y_test)
-    up_samples = np.sum(y_test > 0)
-    down_samples = np.sum(y_test < 0)
-    neutral_samples = np.sum(y_test == 0)
+    total_samples = len(y_train)
+    up_samples = np.sum(y_train > 0)
+    down_samples = np.sum(y_train < 0)
+    neutral_samples = np.sum(y_train == 0)
     
     print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
     
@@ -124,9 +118,35 @@ def train_xgboost_model(
     xgb_model = xgb.XGBRegressor(**xgb_params)
     xgb_model.fit(
         X_train.values, y_train.values,
-        eval_set=[(X_test.values, y_test.values)],
         verbose=False
     )
+    
+    model = XGBoostModel(
+        "xgboost_model",
+        columns=X_train.columns.tolist(),
+        target=target_column,
+        xgb_model=xgb_model,
+    )
+    return model
+
+
+def evaluate_xgboost_model(
+    xgb_model: xgb.XGBRegressor,
+    validation_df: pd.DataFrame,
+    target_column: str,
+    forward_return_column: str,
+    prediction_threshold: float = 0.5
+) -> Tuple[Dict[str, float], pd.DataFrame]:
+    X_test, y_test, forward_return_test, _ = into_X_y(validation_df, target_column, forward_return_column, use_scaler=False)
+    
+    # Print target label distribution in test set
+    print("\nTest set target label distribution:")
+    total_samples = len(y_test)
+    up_samples = np.sum(y_test > 0)
+    down_samples = np.sum(y_test < 0)
+    neutral_samples = np.sum(y_test == 0)
+    
+    print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
     
     # Make predictions
     y_pred = xgb_model.predict(X_test.values)
@@ -138,10 +158,5 @@ def train_xgboost_model(
     validation_y_df['forward_return'] = forward_return_test.values
     validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
 
-    model = XGBoostModel(
-        "xgboost_model",
-        columns=X_train.columns.tolist(),
-        target=target_column,
-        xgb_model=xgb_model,
-    )
-    return model, ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df
+    return ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df
+

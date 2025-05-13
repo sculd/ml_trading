@@ -25,7 +25,7 @@ def _purge(
 
     Args:
         ml_data: DataFrame with time index
-        purge_period: Timedelta for the purge period
+        purge_params: Timedelta for the purge period
 
     Returns:
         A purged DataFrame with selected data points.
@@ -40,8 +40,12 @@ def _purge(
     purged_data = []
     n_purged = 0
     
-    # Process each symbol separately to maintain symbol-specific patterns
-    for symbol, symbol_data in ml_data.groupby('symbol'):
+    # Get unique symbols and sort them to ensure consistent ordering across runs
+    unique_symbols = sorted(ml_data['symbol'].unique())
+    
+    # Process each symbol in sorted order to maintain consistent ordering
+    for symbol in unique_symbols:
+        symbol_data = ml_data[ml_data['symbol'] == symbol]
         symbol_data = symbol_data.sort_index()
         if len(symbol_data) == 0:
             continue
@@ -79,9 +83,11 @@ def _purge(
     # Combine all purged data
     if not purged_data:
         return pd.DataFrame(columns=ml_data.columns)
-        
+    
+    # Concatenate the data from all symbols
     purged_df = pd.concat(purged_data)
-    purged_df = purged_df.sort_index()
+    purged_df = purged_df.sort_values(['timestamp', 'symbol'])
+    
     return purged_df
 
 
@@ -236,9 +242,6 @@ def create_split_moving_forward(
     #ml_data = ml_data.drop(columns=ema_columns + volume_ratio_columns + ['bb_width', 'obv_pct_change'])
 
     ml_data = _purge(ml_data, purge_params)
-    
-    # Sort by timestamp to ensure chronological order
-    ml_data = ml_data.sort_index()
     
     # Initialize variables
     splits = []
