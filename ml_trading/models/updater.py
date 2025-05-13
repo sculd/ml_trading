@@ -8,7 +8,10 @@ from ml_trading.models.manager import LOCAL_MODEL_DIR_BASE
 @dataclass
 class ModelUpdaterParams:
     """Parameters for the ModelUpdaterParams."""
+    # model id is the name of the model as it appears in the file path
     model_id: str
+    # model registry label is the name of a model class as it appears in the registry
+    model_registry_label: str
 
 
 class ModelUpdater:
@@ -20,6 +23,7 @@ class ModelUpdater:
             param: ModelUpdaterParams
         """
         self.model_id = param.model_id
+        self.model_registry_label = param.model_registry_label
         self.last_modified_time = self._get_file_modified_time()
         self.model_class = ml_trading.models.registry.get_model_by_label(self.model_id)
         self.model = None
@@ -44,7 +48,7 @@ class ModelUpdater:
         """Load the model from file."""
         try:
             logging.info(f"Loading model {self.model_id} from {self._get_model_file_path()}")
-            model_class = ml_trading.models.registry.get_model_by_label(self.model_id)
+            model_class = ml_trading.models.registry.get_model_by_label(self.model_registry_label)
             self.model = model_class.load(self._get_model_file_path())
             logging.info(f"Successfully loaded model {self.model_id}")
             return True

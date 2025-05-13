@@ -76,7 +76,7 @@ class LiveOkxStreamReader:
         self.model_updater = None
         if updater_params is not None:
             self.model_updater = ml_trading.models.updater.ModelUpdater(
-                model_id=updater_params.model_id,
+                param=updater_params,
             )
             model = self.model_updater.model
             

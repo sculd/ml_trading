@@ -63,7 +63,7 @@ def train_xgboost_model(
     forward_return_column: str,
     random_state: int = 42,
     xgb_params: Dict[str, Any] = None,
-) -> xgb.XGBRegressor:
+) -> XGBoostModel:
     """
     Train an XGBoost model on the provided data.
     
