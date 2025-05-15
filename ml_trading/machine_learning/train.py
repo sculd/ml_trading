@@ -21,7 +21,7 @@ class TrainingParams:
         self,
         target_column: str,
         resample_params: market_data.machine_learning.resample.ResampleParams,
-        model_id: str,
+        model_class_id: str,
         feature_labels: List[str],
         feature_columns: Optional[List[str]] = None,
         training_time_range: Optional[market_data.util.time.TimeRange] = None,
@@ -33,7 +33,7 @@ class TrainingParams:
         Args:
             target_column: Name of the target column for training
             resample_params: ResampleParams object specifying the resampling parameters
-            model_id: Name of the model to use (e.g., 'xgboost', 'mlp')
+            model_class_id: Name of the model to use (e.g., 'xgboost', 'mlp')
             feature_labels: List of feature labels
             feature_columns: List of specific feature column names to filter columns
             training_time_range: TimeRange object specifying the training period
@@ -44,7 +44,7 @@ class TrainingParams:
         """
         self.target_column = target_column
         self.resample_params = resample_params
-        self.model_id = model_id
+        self.model_class_id = model_class_id
         assert feature_labels is not None, "feature_labels must be specified"
         self.feature_labels = feature_labels
         self.feature_columns = feature_columns
@@ -134,7 +134,8 @@ def train_model(training_params: TrainingParams):
     print(f'train: {len(train_df)}, {train_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {train_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')
 
     # find pattern like 10m in the target column name
-    forward_return_column = re.search(r'\d+m', training_params.target_column).group(0)
+    forward_time_horizon_str = re.search(r'\d+m', training_params.target_column).group(0)
+    forward_return_column = f"label_forward_return_{forward_time_horizon_str}"
     model = ml_trading.models.non_sequential.xgboost_model.train_xgboost_model(
         train_df=train_df,
         target_column=training_params.target_column,

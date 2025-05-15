@@ -48,7 +48,50 @@ class ModelManager:
         os.makedirs(local_model_dir_base, exist_ok=True)
         
         logging.info(f"ModelManager initialized with bucket: {bucket_name}")
+
+    def load_model_from_local(
+            self, 
+            model_id: str, 
+            model_class: Type[MLTradingModel],
+            ) -> Optional[MLTradingModel]:
+        """
+        Load a model from local directory.
+        """
+        try:
+            local_path = os.path.join(self.local_model_dir_base, model_id, model_id)
+            return model_class.load(local_path)
+            
+        except Exception as e:
+            logging.error(f"Error loading model from local directory: {str(e)}")
+            return None
     
+    def save_model_to_local(
+            self, 
+            model_id: str, 
+            model: MLTradingModel,
+            ) -> str:
+        """
+        Save a model to local directory.
+        
+        Args:
+            model_id: Path/name identifier for the model (e.g., 'xgboost_btc_1h')
+            model: Model to save
+            
+        Returns:
+            str: Path to the saved model
+        """
+        try:
+            # Create local directory structure
+            local_model_dir = os.path.join(self.local_model_dir_base, model_id)
+            os.makedirs(local_model_dir, exist_ok=True)
+            local_path = os.path.join(local_model_dir, model_id)
+            model.save(local_path)
+            return local_path
+
+        except Exception as e:
+            logging.error(f"Error downloading model from GCS: {str(e)}")
+            return None
+
     def upload_model(
             self, 
             model_id: str,
@@ -68,8 +111,11 @@ class ModelManager:
             bool: True if upload successful, False otherwise
         """
         try:
-            local_model_id = os.path.join(self.local_model_dir_base, model_id, model_id)
-            model = model_class.load(local_model_id)
+            model = self.load_model_from_local(model_id, model_class)
+            if model is None:
+                logging.error(f"Model not found in local directory: {model_id}")
+                return False
+            
             # Create a temporary directory to determine model type
             with tempfile.TemporaryDirectory() as temp_dir:
                 # Save model in temporary directory to see what files it creates
@@ -101,7 +147,7 @@ class ModelManager:
         except Exception as e:
             logging.error(f"Error uploading model to GCS: {str(e)}")
             return False
-    
+
     def download_model(
             self, 
             model_id: str, 
@@ -138,11 +184,14 @@ class ModelManager:
                 blob.download_to_filename(local_file_path)
                 logging.info(f"Downloaded {blob.name} to {local_file_path}")
             
-            # assume model_id is also filename
-            model = model_class.load(os.path.join(local_model_dir, model_id))
-            logging.info(f"Model successfully loaded using {model_class.__name__}.load()")
-            return model
+
+            model = self.load_model_from_local(model_id, model_class)
+            if model is not None:
+                logging.info(f"Model successfully loaded using {model_class.__name__}.load()")
+                return model
             
         except Exception as e:
             logging.error(f"Error downloading model from GCS: {str(e)}")
             return None
+
+        return None
