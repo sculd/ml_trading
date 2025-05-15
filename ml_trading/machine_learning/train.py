@@ -4,16 +4,12 @@ from typing import List, Optional, Union
 import re
 import datetime
 import market_data.util.time
-import ml_trading.machine_learning.util
 
 import market_data.util
 import market_data.util.time
 import market_data.machine_learning.resample
 
 import market_data.machine_learning.cache_ml_data
-import ml_trading.machine_learning.validation_data
-import ml_trading.models.non_sequential.xgboost_model
-import ml_trading.models.non_sequential.mlp_deep_model
 from ml_trading.models.registry import get_train_function_by_label
 
 
@@ -130,6 +126,7 @@ def _get_train_df(training_params: TrainingParams):
 
 
 def train_model(training_params: TrainingParams):
+    logging.info(f"Training model {training_params.model_class_id} with params: {training_params}")
     train_df = _get_train_df(training_params)
 
     print(f'train: {len(train_df)}, {train_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {train_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')

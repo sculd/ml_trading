@@ -9,8 +9,8 @@ import ml_trading.models.registry
 def main():
     # Create parser and add arguments
     parser = argparse.ArgumentParser(description="Model management tool")
-    parser.add_argument("--action", type=str, choices=["list", "upload", "download", "train"], default="list", 
-                        help="Action to perform: list, upload, download, or train")
+    parser.add_argument("--action", type=str, choices=["list", "upload", "download"], default="list", 
+                        help="Action to perform: list, upload, or download")
     parser.add_argument("--model_id", type=str, help="Name of the model from registry to use")
     
     # Parse arguments
@@ -56,19 +56,6 @@ def main():
             return
         # Download model using the specified model class
         model_manager.download_model(args.model_id, model_class)
-        
-    elif args.action == "train":
-        # Handle train action
-        print(f"Performing train action")
-        if not args.model_id:
-            print("Error: For train action, --model_id is required")
-            return
-        # Implementation for model training
-        # You would train the model here and potentially save it
-        # model = train_model(model_class)
-        # if args.model_id:
-        #     model_manager.upload_model(model, args.model_id)
-
-
+     
 if __name__ == "__main__":
     main() 
