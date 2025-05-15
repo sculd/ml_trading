@@ -90,7 +90,11 @@ def main():
     
     # Add required model class ID argument with default value
     parser.add_argument('--model-class-id', type=str, required=True, default='xgboost',
-                       help='Model class identifier (e.g., xgboost, mlp)')
+                       help='Model class identifier used in the registry (e.g., xgboost, mlp)')
+    
+    # Add required model ID argument
+    parser.add_argument('--model-id', type=str, required=True,
+                       help='Unique identifier for this model instance (e.g., xgboost_v1, mlp_20240320)')
     
     # Add resample parameters argument
     parser.add_argument('--resample-params', type=str, default='close,0.05',
@@ -143,21 +147,8 @@ def main():
     
     # Save the model
     model_manager = ml_trading.models.manager.ModelManager()
-    model_manager.save_model_to_local("xgboost_model_dev", model)
+    model_manager.save_model_to_local(args.model_id, model)
 
 
 if __name__ == "__main__":
     main()
-
-'''
-class TrainingParams:
-    def __init__(
-        self,
-        target_column: str,
-        resample_params: market_data.machine_learning.resample.ResampleParams,
-        model_class_id: str,
-        feature_labels: List[str],
-        feature_columns: Optional[List[str]] = None,
-        training_time_range: Optional[market_data.util.time.TimeRange] = None,
-        training_set_size: Optional[int] = None,
-'''

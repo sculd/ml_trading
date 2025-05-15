@@ -8,11 +8,9 @@ import ml_trading.machine_learning.util
 from ml_trading.models.util import into_X_y
 import ml_trading.models.model
 import os
-import json
-import pickle
-from ml_trading.models.registry import register_model
+from ml_trading.models.registry import register_model, register_train_function
 
-@register_model("xgboost_model")
+@register_model("xgboost")
 class XGBoostModel(ml_trading.models.model.Model):
     def __init__(
         self, 
@@ -56,7 +54,7 @@ class XGBoostModel(ml_trading.models.model.Model):
             xgb_model=xgb_model
         )
 
-
+@register_train_function("xgboost")
 def train_xgboost_model(
     train_df: pd.DataFrame,
     target_column: str,
@@ -68,16 +66,14 @@ def train_xgboost_model(
     Train an XGBoost model on the provided data.
     
     Args:
-        data_df: DataFrame containing features and target
-        target_column: Name of the target column to predict
+        train_df: Training data DataFrame
+        target_column: Name of the target column
+        forward_return_column: Name of the forward return column
         random_state: Random seed for reproducibility
-        xgb_params: Dictionary of XGBoost parameters. If None, uses default parameters
-        prediction_threshold: Threshold for determining neutral predictions. Values between -threshold and +threshold are considered neutral.
+        xgb_params: Optional XGBoost parameters
         
     Returns:
-        Tuple containing:
-        - Trained XGBoost model
-        - Dictionary of evaluation metrics
+        Trained XGBoostModel instance
     """
     # Drop the symbol column
 

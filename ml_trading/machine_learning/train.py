@@ -14,6 +14,7 @@ import market_data.machine_learning.cache_ml_data
 import ml_trading.machine_learning.validation_data
 import ml_trading.models.non_sequential.xgboost_model
 import ml_trading.models.non_sequential.mlp_deep_model
+from ml_trading.models.registry import get_train_function_by_label
 
 
 class TrainingParams:
@@ -136,7 +137,14 @@ def train_model(training_params: TrainingParams):
     # find pattern like 10m in the target column name
     forward_time_horizon_str = re.search(r'\d+m', training_params.target_column).group(0)
     forward_return_column = f"label_forward_return_{forward_time_horizon_str}"
-    model = ml_trading.models.non_sequential.xgboost_model.train_xgboost_model(
+
+
+    # Get the training function from registry
+    train_func = get_train_function_by_label(training_params.model_class_id)
+    if train_func is None:
+        raise ValueError(f"No training function found for model class '{training_params.model_class_id}'")
+
+    model = train_func(
         train_df=train_df,
         target_column=training_params.target_column,
         forward_return_column=forward_return_column)

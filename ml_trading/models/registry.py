@@ -8,6 +8,7 @@ import pkgutil
 logger = logging.getLogger(__name__)
 
 _MODEL_REGISTRY: Dict[str, Any] = {}
+_TRAIN_FUNCTION_REGISTRY: Dict[str, Callable] = {}
 
 def register_model(label: str):
     """
@@ -21,9 +22,26 @@ def register_model(label: str):
     """
     def decorator(model):
         if label in _MODEL_REGISTRY:
-            logger.warning(f"Feature label '{label}' is already registered. Overwriting previous registration.")
+            logger.warning(f"Model label '{label}' is already registered. Overwriting previous registration.")
         _MODEL_REGISTRY[label] = model
         return model
+    return decorator
+
+def register_train_function(label: str):
+    """
+    Decorator to register a training function with a specific label.
+    
+    Args:
+        label: Unique identifier for the training function
+        
+    Returns:
+        Decorator function that registers the training function
+    """
+    def decorator(train_func):
+        if label in _TRAIN_FUNCTION_REGISTRY:
+            logger.warning(f"Training function label '{label}' is already registered. Overwriting previous registration.")
+        _TRAIN_FUNCTION_REGISTRY[label] = train_func
+        return train_func
     return decorator
 
 def get_model_by_label(label: str) -> Optional[Any]:
@@ -44,6 +62,24 @@ def get_model_by_label(label: str) -> Optional[Any]:
         logger.warning(f"Model with label '{label}' not found in registry.")
     return model
 
+def get_train_function_by_label(label: str) -> Optional[Callable]:
+    """
+    Get a training function by its label.
+    
+    Args:
+        label: The unique identifier for the training function
+        
+    Returns:
+        The training function or None if not found
+    """
+    # Ensure models are loaded before accessing
+    import_all_models()
+    
+    train_func = _TRAIN_FUNCTION_REGISTRY.get(label)
+    if train_func is None:
+        logger.warning(f"Training function with label '{label}' not found in registry.")
+    return train_func
+
 def list_registered_model_labels() -> List[str]:
     """
     Get a list of all registered model labels.
@@ -55,6 +91,18 @@ def list_registered_model_labels() -> List[str]:
     import_all_models()
     
     return list(_MODEL_REGISTRY.keys())
+
+def list_registered_train_function_labels() -> List[str]:
+    """
+    Get a list of all registered training function labels.
+    
+    Returns:
+        List of registered training function labels
+    """
+    # Ensure models are loaded before listing
+    import_all_models()
+    
+    return list(_TRAIN_FUNCTION_REGISTRY.keys())
 
 def import_submodules(package_name: str):
     """
