@@ -68,7 +68,9 @@ class LiveOkxStreamReader:
             self, 
             okx_trade_execution_params: ml_trading.live_trading.trade_execution.execution_okx.OkxTradeExecutionParams,
             updater_params: ml_trading.models.updater.ModelUpdaterParams = None,
-            reader_params: LiveOkxStreamReaderParams = None):
+            reader_params: LiveOkxStreamReaderParams = None,
+            resample_params: resample.ResampleParams = None,
+            ):
         self.reader_params = reader_params or LiveOkxStreamReaderParams()
         
         model = None
@@ -79,10 +81,12 @@ class LiveOkxStreamReader:
                 param=updater_params,
             )
             model = self.model_updater.model
-            
+
+        resample_params = resample_params or resample.ResampleParams()
         okx_live_trade_execution = ml_trading.live_trading.trade_execution.execution_okx.TradeExecution(okx_trade_execution_params)
+
         self.candle_processor = ml_trading.streaming.candle_processor.ml_trading.MLTradingProcessor(
-            resample_params=resample.ResampleParams(),
+            resample_params=resample_params,
             purge_params=validation_data.PurgeParams(
                 purge_period=datetime.timedelta(minutes=30)
             ),

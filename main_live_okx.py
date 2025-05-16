@@ -8,6 +8,7 @@ import setup_env # needed for the environment variables
 import ml_trading.live_trading.trade_execution.execution_okx
 from ml_trading.streaming.candle_reader.live_okx_native import LiveOkxStreamReader, LiveOkxStreamReaderParams
 from ml_trading.models.updater import ModelUpdaterParams
+import main_util
 
 
 def main():
@@ -20,6 +21,8 @@ def main():
     parser.add_argument('--leverage', type=float, default=5.0, help='Set leverage level')
     parser.add_argument("--model-id", type=str, help="Name of the model from registry to use")
     parser.add_argument("--model-class-id", type=str, help="Model class identifier (e.g., 'xgboost', 'lightgbm') to use for model identification")
+    parser.add_argument('--resample-params', type=str, default='close,0.05',
+                        help='Resampling parameters in format "price_col,threshold" (e.g., "close,0.05")')
     
     # For boolean arguments with explicit values
     def str2bool(v):
@@ -48,11 +51,6 @@ def main():
         is_dry_run=args.dryrun,
     )
     
-    # Configure stream reader parameters
-    reader_params = LiveOkxStreamReaderParams(
-        disable_ssl_verify=not args.ssl_verify
-    )
-
     # Only create model updater params if both model arguments are provided
     model_updater_params = None
     if args.model_id and args.model_class_id:
@@ -60,6 +58,16 @@ def main():
             model_id=args.model_id,
             model_registry_label=args.model_class_id,
         )
+
+    # Configure stream reader parameters
+    reader_params = LiveOkxStreamReaderParams(
+        disable_ssl_verify=not args.ssl_verify
+    )
+
+    # Parse resample parameters
+    resample_params = None
+    if args.resample_params:
+        resample_params = main_util.parse_resample_params(args.resample_params)
     
     print(f"Running with settings:")
     print(f"Trade Execution: {okx_trade_execution_params}")
@@ -71,6 +79,7 @@ def main():
         okx_trade_execution_params,
         updater_params=model_updater_params,
         reader_params=reader_params,
+        resample_params=resample_params,
         )
     
     # Set up shutdown handlers
