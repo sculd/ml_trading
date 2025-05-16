@@ -218,7 +218,7 @@ class LiveOkxStreamReader:
                 if self._shutdown_event.is_set():
                     break
                     
-                logging.debug("Checking for model updates")
+                logging.info("Checking for model updates")
                 
                 if self.model_updater.check_for_updates():
                     # Update the model in the candle processor
@@ -249,7 +249,7 @@ class LiveOkxStreamReader:
                     
                 if self.ws:
                     await self.ws.send("ping")
-                    logging.debug("Ping sent")
+                    logging.info("Ping sent")
             except asyncio.CancelledError:
                 logging.info("Ping sender task cancelled")
                 break
@@ -260,6 +260,7 @@ class LiveOkxStreamReader:
 
     async def handle_messages(self):
         try:
+            cnt = 0
             async for message in self.ws:
                 if self._shutdown_event.is_set():
                     break
@@ -268,7 +269,7 @@ class LiveOkxStreamReader:
                     # Check if this is a pong response (should be a string "pong")
                     if message == 'pong':
                         self.last_pong_time = time.time()
-                        logging.debug("Pong received")
+                        logging.info("Pong received")
                         continue
                         
                     data = json.loads(message)
@@ -299,8 +300,11 @@ class LiveOkxStreamReader:
                                 bwt_dict['close'], 
                                 bwt_dict['volume']
                             )
+                            cnt += 1
+                            if cnt % 10000 == 0:
+                                logging.info(f"{bwt_dict}")
                     else:
-                        logging.debug(f"Unhandled message: {data}")
+                        logging.warning(f"Unhandled message: {data}")
                 except Exception as e:
                     logging.error(f"Error processing message: {e}, message: {message}")
         except asyncio.CancelledError:
