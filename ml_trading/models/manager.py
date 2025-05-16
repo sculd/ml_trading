@@ -31,7 +31,7 @@ class ModelManager:
     - Provides utility functions for listing and deleting models
     - Handles serialization and deserialization using model's built-in methods
     """
-    def __init__(self, bucket_name: str = _bucket_name, local_model_dir_base: str = LOCAL_MODEL_DIR_BASE):
+    def __init__(self, bucket_name: str = _bucket_name):
         """
         Initialize the ModelManager.
         
@@ -40,12 +40,11 @@ class ModelManager:
             local_model_dir: Local directory for temporarily storing models
         """
         self.bucket_name = bucket_name
-        self.local_model_dir_base = local_model_dir_base
         self.storage_client = storage.Client()
         self.bucket = self.storage_client.bucket(bucket_name)
         
         # Create local directory if it doesn't exist
-        os.makedirs(local_model_dir_base, exist_ok=True)
+        os.makedirs(LOCAL_MODEL_DIR_BASE, exist_ok=True)
         
         logging.info(f"ModelManager initialized with bucket: {bucket_name}")
 
@@ -58,7 +57,7 @@ class ModelManager:
         Load a model from local directory.
         """
         try:
-            local_path = os.path.join(self.local_model_dir_base, model_id, model_id)
+            local_path = os.path.join(LOCAL_MODEL_DIR_BASE, model_id, model_id)
             return model_class.load(local_path)
             
         except Exception as e:
@@ -82,7 +81,7 @@ class ModelManager:
         """
         try:
             # Create local directory structure
-            local_model_dir = os.path.join(self.local_model_dir_base, model_id)
+            local_model_dir = os.path.join(LOCAL_MODEL_DIR_BASE, model_id)
             os.makedirs(local_model_dir, exist_ok=True)
             local_path = os.path.join(local_model_dir, model_id)
             model.save(local_path)
@@ -165,7 +164,7 @@ class ModelManager:
         """
         try:
             # Create local directory structure
-            local_model_dir = os.path.join(self.local_model_dir_base, model_id)
+            local_model_dir = os.path.join(LOCAL_MODEL_DIR_BASE, model_id)
             os.makedirs(local_model_dir, exist_ok=True)
             
             # List all blobs with the model path prefix
