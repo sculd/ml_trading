@@ -3,10 +3,13 @@ import argparse
 import asyncio
 import logging
 import signal
+import sys
 import setup_env # needed for the environment variables
 import ml_trading.live_trading.trade_execution.execution_okx
 from ml_trading.streaming.candle_reader.live_okx_native import LiveOkxStreamReader, LiveOkxStreamReaderParams
 from ml_trading.models.updater import ModelUpdaterParams
+
+
 def main():
     """
     Main function for the trading application.
@@ -71,12 +74,15 @@ def main():
         )
     
     # Set up shutdown handlers
-    def shutdown_handler(signum, frame):
+    async def shutdown_handler(signum, frame):
         print("Shutting down...")
-        client.should_run = False
+        await client.shutdown()
         
-    signal.signal(signal.SIGINT, shutdown_handler)
-    signal.signal(signal.SIGTERM, shutdown_handler)
+    def signal_handler(signum, frame):
+        asyncio.create_task(shutdown_handler(signum, frame))
+        
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
     
     # Run the client
     asyncio.run(client.connect())

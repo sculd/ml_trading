@@ -92,12 +92,39 @@ class LiveOkxStreamReader:
         )
         self.ws = None
         self.last_pong_time = None
-        self.should_run = True
         self.last_pong_time = time.time()
         self.model_updater_task = None
+        self.ping_sender_task = None
+        self._shutdown_event = asyncio.Event()
+
+    async def shutdown(self):
+        """Properly shutdown the stream reader."""
+        logging.info("Initiating shutdown...")
+        self._shutdown_event.set()
+        
+        # Cancel all running tasks
+        if self.ping_sender_task:
+            self.ping_sender_task.cancel()
+            try:
+                await self.ping_sender_task
+            except asyncio.CancelledError:
+                pass
+            
+        if self.model_updater_task:
+            self.model_updater_task.cancel()
+            try:
+                await self.model_updater_task
+            except asyncio.CancelledError:
+                pass
+        
+        # Close WebSocket connection if it exists
+        if self.ws:
+            await self.ws.close()
+            
+        logging.info("Shutdown complete")
 
     async def connect(self):
-        while self.should_run:
+        while not self._shutdown_event.is_set():
             try:
                 ssl_context = None
                 if self.reader_params.disable_ssl_verify:
@@ -124,30 +151,73 @@ class LiveOkxStreamReader:
                     logging.info(f"Subscribed to {len(symbols)} symbols")
 
                     # Start tasks for ping/pong and model updates
-                    ping_sender = asyncio.create_task(self.send_ping())
+                    self.ping_sender_task = asyncio.create_task(self.send_ping())
                     
                     # Start model updater task if model updater exists
                     if self.model_updater:
                         self.model_updater_task = asyncio.create_task(self.check_model_updates())
                     
-                    # Handle messages
-                    await self.handle_messages()
+                    # Start pong timeout checker
+                    pong_checker_task = asyncio.create_task(self.check_pong_timeout())
                     
-                    # Cancel tasks when connection is closed
-                    ping_sender.cancel()
-                    if self.model_updater_task:
-                        self.model_updater_task.cancel()
+                    try:
+                        # Handle messages
+                        await self.handle_messages()
+                    except websockets.exceptions.ConnectionClosed:
+                        logging.warning("WebSocket connection closed unexpectedly")
+                        # Don't break here, let the outer loop handle reconnection
+                    except Exception as e:
+                        logging.error(f"Error in message handler: {e}")
+                        # Don't break here, let the outer loop handle reconnection
+                    finally:
+                        # Cancel pong checker task
+                        pong_checker_task.cancel()
+                        try:
+                            await pong_checker_task
+                        except asyncio.CancelledError:
+                            pass
                     
+            except asyncio.CancelledError:
+                logging.info("Connection cancelled")
+                break
+            except websockets.exceptions.ConnectionClosed:
+                logging.warning("WebSocket connection closed, attempting to reconnect...")
+                if self._shutdown_event.is_set():
+                    break
+                await asyncio.sleep(5)  # Backoff before reconnect
             except Exception as e:
                 logging.error(f"WebSocket connection failed: {e}")
+                if self._shutdown_event.is_set():
+                    break
                 await asyncio.sleep(5)  # Backoff before reconnect
+            finally:
+                # Clean up tasks
+                if self.ping_sender_task:
+                    self.ping_sender_task.cancel()
+                    try:
+                        await self.ping_sender_task
+                    except asyncio.CancelledError:
+                        pass
+                    
+                if self.model_updater_task:
+                    self.model_updater_task.cancel()
+                    try:
+                        await self.model_updater_task
+                    except asyncio.CancelledError:
+                        pass
+                
+                # Clear WebSocket reference
+                self.ws = None
 
     async def check_model_updates(self):
         """Task to periodically check for model updates."""
         logging.info("Starting model updater task")
-        while True:
+        while not self._shutdown_event.is_set():
             try:
                 await asyncio.sleep(_model_check_interval)
+                if self._shutdown_event.is_set():
+                    break
+                    
                 logging.debug("Checking for model updates")
                 
                 if self.model_updater.check_for_updates():
@@ -164,66 +234,101 @@ class LiveOkxStreamReader:
                 break
             except Exception as e:
                 logging.error(f"Error in model updater task: {e}")
+                if self._shutdown_event.is_set():
+                    break
                 # Don't break the loop for other exceptions, keep trying
 
-    async def handle_messages(self):
-        async for message in self.ws:
-            try:
-                # Check if this is a pong response (should be a string "pong")
-                if message == 'pong':
-                    self.last_pong_time = time.time()
-                    logging.debug("Pong received")
-                    continue
-                    
-                data = json.loads(message)
-                
-                # Handle errors
-                if 'event' in data and data['event'] == 'error':
-                    logging.error(f"Received error from OKX: {data}")
-                    continue
-                
-                # Handle successful subscription response
-                if 'event' in data and data['event'] == 'subscribe':
-                    logging.info(f"Successfully subscribed: {data}")
-                    continue
-                
-                # Handle candle data
-                if 'data' in data and 'arg' in data:
-                    msg_data = data['data']
-                    symbol = data['arg']['instId']
-                    bwt_dicts = _message_to_bwt_dicts(symbol, msg_data)
-                    
-                    for bwt_dict in bwt_dicts:
-                        self.candle_processor.on_candle(
-                            bwt_dict['epoch_seconds'], 
-                            bwt_dict['symbol'], 
-                            bwt_dict['open'], 
-                            bwt_dict['high'], 
-                            bwt_dict['low'], 
-                            bwt_dict['close'], 
-                            bwt_dict['volume']
-                        )
-                else:
-                    logging.debug(f"Unhandled message: {data}")
-            except Exception as e:
-                logging.error(f"Error processing message: {e}, message: {message}")
-
     async def send_ping(self):
-        while True:
+        """Task to send periodic pings to keep the connection alive."""
+        logging.info("Starting ping sender task")
+        while not self._shutdown_event.is_set():
             try:
                 await asyncio.sleep(_ping_interval_seconds)
-                
-                # Check if last pong was too long ago
-                delta = time.time() - self.last_pong_time
-                if delta > (_ping_interval_seconds + _pong_timeout_seconds):
-                    logging.warn("Pong timeout. Triggering reconnect...")
-                    await self.ws.close()
-                    return  # Exit to reconnect loop
+                if self._shutdown_event.is_set():
+                    break
                     
-                # According to OKX docs, just send a string 'ping', not a JSON object
-                await self.ws.send('ping')
-                logging.debug("Ping sent")
-                
+                if self.ws:
+                    await self.ws.send("ping")
+                    logging.debug("Ping sent")
+            except asyncio.CancelledError:
+                logging.info("Ping sender task cancelled")
+                break
             except Exception as e:
-                logging.error(f"Failed to send ping: {e}")
-                return  # Exit to reconnect loop
+                logging.error(f"Error sending ping: {e}")
+                if self._shutdown_event.is_set():
+                    break
+
+    async def handle_messages(self):
+        try:
+            async for message in self.ws:
+                if self._shutdown_event.is_set():
+                    break
+                    
+                try:
+                    # Check if this is a pong response (should be a string "pong")
+                    if message == 'pong':
+                        self.last_pong_time = time.time()
+                        logging.debug("Pong received")
+                        continue
+                        
+                    data = json.loads(message)
+                    
+                    # Handle errors
+                    if 'event' in data and data['event'] == 'error':
+                        logging.error(f"Received error from OKX: {data}")
+                        continue
+                    
+                    # Handle successful subscription response
+                    if 'event' in data and data['event'] == 'subscribe':
+                        logging.info(f"Successfully subscribed: {data}")
+                        continue
+                    
+                    # Handle candle data
+                    if 'data' in data and 'arg' in data:
+                        msg_data = data['data']
+                        symbol = data['arg']['instId']
+                        bwt_dicts = _message_to_bwt_dicts(symbol, msg_data)
+                        
+                        for bwt_dict in bwt_dicts:
+                            self.candle_processor.on_candle(
+                                bwt_dict['epoch_seconds'], 
+                                bwt_dict['symbol'], 
+                                bwt_dict['open'], 
+                                bwt_dict['high'], 
+                                bwt_dict['low'], 
+                                bwt_dict['close'], 
+                                bwt_dict['volume']
+                            )
+                    else:
+                        logging.debug(f"Unhandled message: {data}")
+                except Exception as e:
+                    logging.error(f"Error processing message: {e}, message: {message}")
+        except asyncio.CancelledError:
+            logging.info("Message handler cancelled")
+            raise  # Re-raise to be handled by connect()
+        except websockets.exceptions.ConnectionClosed:
+            logging.warning("WebSocket connection closed in message handler")
+            raise  # Re-raise to be handled by connect()
+        except Exception as e:
+            logging.error(f"Error in message handler: {e}")
+            raise  # Re-raise to be handled by connect()
+
+    async def check_pong_timeout(self):
+        """Task to check for pong timeout and force reconnection if needed."""
+        while not self._shutdown_event.is_set():
+            try:
+                await asyncio.sleep(1)  # Check every second
+                if self._shutdown_event.is_set():
+                    break
+                    
+                if self.ws and time.time() - self.last_pong_time > _pong_timeout_seconds:
+                    logging.warning(f"No pong received for {_pong_timeout_seconds} seconds, forcing reconnection")
+                    await self.ws.close()
+                    break
+            except asyncio.CancelledError:
+                logging.info("Pong timeout checker cancelled")
+                break
+            except Exception as e:
+                logging.error(f"Error in pong timeout checker: {e}")
+                if self._shutdown_event.is_set():
+                    break
