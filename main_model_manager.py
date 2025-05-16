@@ -12,8 +12,8 @@ def main():
     parser = argparse.ArgumentParser(description="Model management tool")
     parser.add_argument("--action", type=str, choices=["list", "upload", "download"], default="list", 
                         help="Action to perform: list, upload, or download")
-    parser.add_argument("--model_id", type=str, help="Name of the model from registry to use")
-    parser.add_argument("--model_class_id", type=str, help="Model class identifier (e.g., 'xgboost', 'lightgbm') to use for model identification")
+    parser.add_argument("--model-id", type=str, help="Name of the model from registry to use")
+    parser.add_argument("--model-class-id", type=str, help="Model class identifier (e.g., 'xgboost', 'lightgbm') to use for model identification")
     
     # Parse arguments
     args = parser.parse_args()
@@ -56,10 +56,10 @@ def main():
     elif args.action in ["upload", "download"]:
         # Check required arguments for non-list actions
         if not args.model_id:
-            print("Error: For upload/download actions, --model_id is required")
+            print("Error: For upload/download actions, --model-id is required")
             return
         if not args.model_class_id:
-            print("Error: For upload/download actions, --model_class_id is required")
+            print("Error: For upload/download actions, --model-class-id is required")
             return
             
         if args.action == "upload":
