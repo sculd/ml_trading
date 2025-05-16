@@ -229,6 +229,8 @@ class LiveOkxStreamReader:
                         logging.info("Model successfully updated in live trading system")
                     else:
                         logging.warning("Model updater returned True but no model is available")
+                else:
+                    logging.info("No model updates found")
             except asyncio.CancelledError:
                 logging.info("Model updater task cancelled")
                 break
