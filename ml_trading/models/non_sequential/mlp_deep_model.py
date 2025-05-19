@@ -20,7 +20,7 @@ class MLPModel(nn.Module):
     def __init__(
         self, 
         input_dim: int, 
-        hidden_layers: List[int] = [64, 32],
+        hidden_layers: List[int] = [32, 32],
         output_dim: int = 1, 
         dropout_rate: float = 0.2,
         use_norm: bool = False
@@ -179,7 +179,7 @@ def train_mlp_model(
     epochs: int = 100,
     batch_size: int = 64,
     hidden_layers: List[int] = [128, 64, 32],
-    dropout_rate: float = 0.3,
+    dropout_rate: float = 0.2,
     learning_rate: float = 0.001,
     early_stopping_patience: int = 10,
     prediction_threshold: float = 0.1,
@@ -189,7 +189,7 @@ def train_mlp_model(
     verbose: bool = True,
     use_scaler: bool = True,
     use_norm: bool = False
-) -> Tuple[MLPModel, Dict[str, float], pd.DataFrame]:
+) -> MLPDeepModel:
     """Train an MLP model on the provided data."""
     # Use _device from util module
     print(f"Using _device: {_device}")
@@ -199,10 +199,10 @@ def train_mlp_model(
     X_val, y_test, forward_return_test, _ = _process_data(validation_df, target_column, forward_return_column, scaler=scaler, use_scaler=use_scaler)
     
     # Print label distribution
-    print(f"\nTotal validation samples: {len(y_test)}")
-    print(f"Positive: {np.sum(y_test > 0)} ({np.sum(y_test > 0)/len(y_test)*100:.2f}%)")
-    print(f"Negative: {np.sum(y_test < 0)} ({np.sum(y_test < 0)/len(y_test)*100:.2f}%)")
-    print(f"Neutral: {np.sum(y_test == 0)} ({np.sum(y_test == 0)/len(y_test)*100:.2f}%)")
+    print(f"\nTotal training samples: {len(y_train)}")
+    print(f"Positive: {np.sum(y_train > 0)} ({np.sum(y_train > 0)/len(y_train)*100:.2f}%)")
+    print(f"Negative: {np.sum(y_train < 0)} ({np.sum(y_train < 0)/len(y_train)*100:.2f}%)")
+    print(f"Neutral: {np.sum(y_train == 0)} ({np.sum(y_train == 0)/len(y_train)*100:.2f}%)")
     
     # Create tensors
     X_train_tensor = torch.from_numpy(X_train)
@@ -224,6 +224,7 @@ def train_mlp_model(
     
     # Define loss and optimizer
     criterion = nn.L1Loss()
+    #criterion = nn.MSELoss()
     if optimizer_type.lower() == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
     else:  # default to Adam
@@ -306,19 +307,51 @@ def train_mlp_model(
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
     
+    model_wrapped = MLPDeepModel(
+        model_name=f"mlp_model",
+        columns=train_df.columns.tolist(),
+        target=target_column,
+        mlp_model=model
+    )
+    
+    return model_wrapped
+
+
+def evaluate_mlp_model(
+    mlp_model: MLPModel,
+    validation_df: pd.DataFrame,
+    target_column: str,
+    forward_return_column: str,
+    prediction_threshold: float = 0.5
+) -> Tuple[Dict[str, float], pd.DataFrame]:
+    X_test, y_test, forward_return_test, _ = _process_data(validation_df, target_column, forward_return_column, use_scaler=False)
+    
+    # Create tensors
+    X_val_tensor = torch.from_numpy(X_test)
+    y_val_tensor = torch.from_numpy(y_test)
+    
+    # Print target label distribution in test set
+    print("\nTest set target label distribution:")
+    total_samples = len(y_test)
+    up_samples = np.sum(y_test > 0)
+    down_samples = np.sum(y_test < 0)
+    neutral_samples = np.sum(y_test == 0)
+    
+    print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
+    
     # Make predictions
-    model.eval()
+    # Make predictions
+    mlp_model.eval()
     with torch.no_grad():
         # Always use batch prediction to avoid memory issues
         preds = []
         batch_size = 32
         for i in range(0, len(X_val_tensor), batch_size):
             batch = X_val_tensor[i:i+batch_size].to(_device)
-            batch_preds = model(batch).cpu().numpy()
+            batch_preds = mlp_model(batch).cpu().numpy()
             preds.append(batch_preds)
         y_pred = np.concatenate(preds).flatten()
     
-    # Create results DataFrame
     validation_y_df = validation_df.copy()
     validation_y_df['symbol'] = validation_df['symbol']
     validation_y_df['y'] = y_test
@@ -326,14 +359,5 @@ def train_mlp_model(
     validation_y_df['forward_return'] = forward_return_test
     validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
     
-    # Calculate metrics
-    metrics = ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold)
-    
-    model_wrapped = MLPDeepModel(
-        model_name=f"mlp_deep_model",
-        columns=train_df.columns.tolist(),
-        target=target_column,
-        mlp_model=model
-    )
-    
-    return model_wrapped, metrics, validation_y_df
+    return ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df
+

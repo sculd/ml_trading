@@ -19,9 +19,11 @@ import ml_trading.models.non_sequential.mlp_deep_model
 import ml_trading.models.non_sequential.lightgbm_model
 time_range = market_data.util.time.TimeRange(
     #date_str_from='2024-01-01', date_str_to='2025-05-10',
-    date_str_from='2024-10-01', date_str_to='2025-05-10',
+    date_str_from='2024-08-01', date_str_to='2025-05-10',
     )
 
+
+ml_data = pd.read_parquet('ml_data/ml_data_seq_df_2024-07_2025_04.parquet')
 
 #'''
 data_sets = ml_trading.machine_learning.validation_data.create_split_moving_forward(
@@ -35,6 +37,7 @@ data_sets = ml_trading.machine_learning.validation_data.create_split_moving_forw
     validation_fixed_event_size = 300,
     test_fixed_event_size= 0,
     window_type='fixed',
+    ml_data=ml_data,
 )
 #'''
 
