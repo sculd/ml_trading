@@ -344,6 +344,9 @@ def evaluate_lstm_model(
     forward_return_column: str,
     prediction_threshold: float = 0.5
 ) -> Tuple[Dict[str, float], pd.DataFrame]:
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.info(f"Using device: {device}")
+    
     X_test, y_test, forward_return_test, _ = into_X_y(validation_df, target_column, forward_return_column, use_scaler=False)
     
     # Convert numpy arrays to PyTorch tensors
@@ -367,7 +370,7 @@ def evaluate_lstm_model(
     
     print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
     
-    X_test_tensor = torch.FloatTensor(X_test)
+    X_test_tensor = torch.FloatTensor(X_test).to(device)
 
     # Make predictions
     lstm_model.eval()
