@@ -196,6 +196,7 @@ def create_split_moving_forward(
     step_event_size: int = 500,
     validation_fixed_event_size: int = 300,
     test_fixed_event_size: int = 150,
+    ml_data: Optional[pd.DataFrame] = None,
 ) -> List[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
     """
     Create moving window splits with fixed training size and fixed event sizes for validation and test sets.
@@ -230,16 +231,17 @@ def create_split_moving_forward(
         raise ValueError("test_fixed_event_size must be non-negative")
     
     # Load the full dataset
-    ml_data = load_cached_ml_data(
-        dataset_mode=dataset_mode,
-        export_mode=export_mode,
-        aggregation_mode=aggregation_mode,
-        time_range=time_range,
-        target_params_batch=target_params,
-        resample_params=resample_params,
-        seq_params=seq_params,
-    )
-    #ml_data = ml_data.drop(columns=ema_columns + volume_ratio_columns + ['bb_width', 'obv_pct_change'])
+    if ml_data is None:
+        ml_data = load_cached_ml_data(
+            dataset_mode=dataset_mode,
+            export_mode=export_mode,
+            aggregation_mode=aggregation_mode,
+            time_range=time_range,
+            target_params_batch=target_params,
+            resample_params=resample_params,
+            seq_params=seq_params,
+        )
+        #ml_data = ml_data.drop(columns=ema_columns + volume_ratio_columns + ['bb_width', 'obv_pct_change'])
 
     ml_data = _purge(ml_data, purge_params)
     

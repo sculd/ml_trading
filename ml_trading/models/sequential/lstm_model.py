@@ -6,6 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from typing import List, Tuple, Dict, Optional, Union
 from ml_trading.models.sequential.util import into_X_y
+import ml_trading.machine_learning.util
 import logging
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,7 @@ def train_lstm_model(
     train_df: pd.DataFrame,
     validation_df: pd.DataFrame,
     target_column: str,
+    forward_return_column: str,
     hidden_dim: int = 128,
     num_layers: int = 2,
     learning_rate: float = 0.0001,
@@ -141,19 +143,36 @@ def train_lstm_model(
     torch.set_num_threads(1)
     
     # Process data
-    X_train, y_train, scaler = into_X_y(
-        train_df, target_column, use_scaler=use_scaler
+    X_train, y_train, forward_return_train, scaler = into_X_y(
+        train_df, target_column, forward_return_column, use_scaler=use_scaler
     )
-    
-    X_val, y_val, _ = into_X_y(
-        validation_df, target_column, scaler=scaler, use_scaler=False
+    X_val, y_val, forward_return_val, _ = into_X_y(
+        validation_df, target_column, forward_return_column, scaler=scaler, use_scaler=False
     )
-    
+
     # Convert numpy arrays to PyTorch tensors
-    X_train_tensor = torch.FloatTensor(X_train.values)
-    y_train_tensor = torch.FloatTensor(y_train.values)
-    X_val_tensor = torch.FloatTensor(X_val.values)
-    y_val_tensor = torch.FloatTensor(y_val.values)
+    if type(X_train) == pd.DataFrame:
+        X_train = X_train.values
+        y_train = y_train.values
+        forward_return_train = forward_return_train.values
+        X_val = X_val.values
+        y_val = y_val.values
+        forward_return_val = forward_return_val.values
+    
+    mask = ~np.isnan(X_train).any(axis=(1, 2))
+    X_train = X_train[mask]
+    y_train = y_train[mask]
+    forward_return_train = forward_return_train[mask]
+
+    mask_val = ~np.isnan(X_val).any(axis=(1, 2))
+    X_val = X_val[mask_val]
+    y_val = y_val[mask_val]
+    forward_return_val = forward_return_val[mask_val]
+
+    X_train_tensor = torch.FloatTensor(X_train)
+    y_train_tensor = torch.FloatTensor(y_train)
+    X_val_tensor = torch.FloatTensor(X_val)
+    y_val_tensor = torch.FloatTensor(y_val)
 
     # Create DataLoaders
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)    
@@ -176,7 +195,7 @@ def train_lstm_model(
     logger.info(f"Model architecture: {model}")
     
     # Loss function and optimizer
-    criterion = nn.MSELoss()
+    criterion = nn.L1Loss()
     
     if optimizer_type.lower() == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -232,7 +251,7 @@ def train_lstm_model(
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_norm)
             
             # Debug gradient info
-            if (epoch == 0 or epoch % 20 == 0) and batch_count % 10 == 0:
+            if (epoch == 0 or epoch % 5 == 0) and batch_count % 10 == 0:
                 grad_norm = 0.0
                 for p in model.parameters():
                     if p.grad is not None:
@@ -312,15 +331,55 @@ def train_lstm_model(
     else:
         model.load_state_dict(recent_model)
     
-    validation_y_df = pd.DataFrame(index=validation_df.index)
-    validation_y_df['symbol'] = validation_df['symbol']
-    validation_y_df['y'] = y_val
-    validation_y_df['pred'] = np.vstack(val_predictions) 
-    validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
-
     return {
         'model': model,
         'scaler': scaler,
         'history': history,
-        'validation_y_df': validation_y_df
     }
+
+def evaluate_lstm_model(
+    lstm_model: LSTMModel,
+    validation_df: pd.DataFrame,
+    target_column: str,
+    forward_return_column: str,
+    prediction_threshold: float = 0.5
+) -> Tuple[Dict[str, float], pd.DataFrame]:
+    X_test, y_test, forward_return_test, _ = into_X_y(validation_df, target_column, forward_return_column, use_scaler=False)
+    
+    # Convert numpy arrays to PyTorch tensors
+    if type(X_test) == pd.DataFrame:
+        X_test = X_test.values
+        y_test = y_test.values
+        forward_return_test = forward_return_test.values
+    
+    mask = ~np.isnan(X_test).any(axis=(1, 2))
+    validation_df = validation_df[mask]
+    X_test = X_test[mask]
+    y_test = y_test[mask]
+    forward_return_test = forward_return_test[mask]
+
+    # Print target label distribution in test set
+    print("\nTest set target label distribution:")
+    total_samples = len(y_test)
+    up_samples = np.sum(y_test > 0)
+    down_samples = np.sum(y_test < 0)
+    neutral_samples = np.sum(y_test == 0)
+    
+    print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
+    
+    X_test_tensor = torch.FloatTensor(X_test)
+
+    # Make predictions
+    lstm_model.eval()
+    y_pred = lstm_model.forward(X_test_tensor)
+    y_pred_values = y_pred.detach().numpy()
+
+    validation_y_df = pd.DataFrame(index=validation_df.index)
+    validation_y_df['symbol'] = validation_df['symbol']
+    validation_y_df['y'] = y_test
+    validation_y_df['pred'] = y_pred_values
+    validation_y_df['forward_return'] = forward_return_test
+    validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
+
+    return ml_trading.machine_learning.util.get_metrics(y_test, y_pred_values, prediction_threshold), validation_y_df
+
