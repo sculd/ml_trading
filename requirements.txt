@@ -1,13 +1,11 @@
 market_data
-scikit-learn
-xgboost
 pandas
 numpy
-pytorch
+scikit-learn
+xgboost
 hmmlearn
+torch
 google-cloud-storage
 dotenv
-scikit-learn
-hmmlearn
 tqdm
-xgboost
+matplotlib
