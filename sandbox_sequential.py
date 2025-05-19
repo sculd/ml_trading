@@ -137,7 +137,7 @@ def run_with_feature_column_prefix(feature_column_prefixes = None):
             target_column=target_column,
             forward_return_column=forward_return_column,
             use_scaler=True,
-            learning_rate = 0.0001,
+            learning_rate = 0.0005,
             num_epochs = 100,
             early_stopping_patience = 50,
             )
@@ -148,7 +148,7 @@ def run_with_feature_column_prefix(feature_column_prefixes = None):
             validation_df=validation_df,
             target_column=target_column,
             forward_return_column=forward_return_column,
-            prediction_threshold=0.70
+            prediction_threshold=0.50
         )
         validation_y_df['model_num'] = i+1
         all_validation_dfs.append(validation_y_df)
