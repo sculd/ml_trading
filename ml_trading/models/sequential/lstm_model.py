@@ -251,7 +251,7 @@ def train_lstm_model(
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_norm)
             
             # Debug gradient info
-            if (epoch == 0 or epoch % 5 == 0) and batch_count % 10 == 0:
+            if (epoch == 0 or epoch % 20 == 0) and batch_count % 10 == 0:
                 grad_norm = 0.0
                 for p in model.parameters():
                     if p.grad is not None:
