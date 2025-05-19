@@ -375,7 +375,7 @@ def evaluate_lstm_model(
     # Make predictions
     lstm_model.eval()
     y_pred = lstm_model.forward(X_test_tensor)
-    y_pred_values = y_pred.detach().numpy()
+    y_pred_values = y_pred.detach().cpu().numpy()
 
     validation_y_df = pd.DataFrame(index=validation_df.index)
     validation_y_df['symbol'] = validation_df['symbol']
