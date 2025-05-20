@@ -91,7 +91,7 @@ class LiveOkxStreamReader:
                 purge_period=datetime.timedelta(minutes=30)
             ),
             model=model,
-            threshold=0.7,
+            threshold=updater_params.score_threshold,
             live_trade_execution=okx_live_trade_execution,
         )
         self.ws = None

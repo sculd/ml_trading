@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--leverage', type=float, default=5.0, help='Set leverage level')
     parser.add_argument("--model-id", type=str, help="Name of the model from registry to use")
     parser.add_argument("--model-class-id", type=str, help="Model class identifier (e.g., 'xgboost', 'lightgbm') to use for model identification")
+    parser.add_argument('--score-threshold', type=float, default=0.7, help='Set score threshold for model prediction to take a trade')
     parser.add_argument('--resample-params', type=str, default='close,0.05',
                         help='Resampling parameters in format "price_col,threshold" (e.g., "close,0.05")')
     
@@ -57,6 +58,7 @@ def main():
         model_updater_params = ModelUpdaterParams(
             model_id=args.model_id,
             model_registry_label=args.model_class_id,
+            score_threshold=args.score_threshold,
         )
 
     # Configure stream reader parameters
