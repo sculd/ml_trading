@@ -16,14 +16,14 @@ def main():
     Main function for the trading application.
     """
     parser = argparse.ArgumentParser(description='ML Trading Application')
-    parser.add_argument('--betsize', type=float, default=100.0, help='Set target bet size')
+    parser.add_argument('--betsize', type=float, default=100.0, help='Set target bet size (default: %(default)s)')
     parser.add_argument('--dryrun', action='store_true', help='Run in dryrun mode')
-    parser.add_argument('--leverage', type=float, default=5.0, help='Set leverage level')
+    parser.add_argument('--leverage', type=float, default=5.0, help='Set leverage level (default: %(default)s)')
     parser.add_argument("--model-id", type=str, help="Name of the model from registry to use")
     parser.add_argument("--model-class-id", type=str, help="Model class identifier (e.g., 'xgboost', 'lightgbm') to use for model identification")
-    parser.add_argument('--score-threshold', type=float, default=0.7, help='Set score threshold for model prediction to take a trade')
+    parser.add_argument('--score-threshold', type=float, default=0.7, help='Set score threshold for model prediction to take a trade (default: %(default)s)')
     parser.add_argument('--resample-params', type=str, default='close,0.05',
-                        help='Resampling parameters in format "price_col,threshold" (e.g., "close,0.05")')
+                        help='Resampling parameters in format "price_col,threshold" (e.g., "close,0.05") (default: %(default)s)')
     
     # For boolean arguments with explicit values
     def str2bool(v):
