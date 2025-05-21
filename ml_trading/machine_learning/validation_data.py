@@ -1,6 +1,6 @@
 import pandas as pd
 import datetime
-from typing import Tuple, Optional, List, Dict, Any
+from typing import Tuple, Optional, List, Dict, Any, Union
 from dataclasses import dataclass
 from market_data.machine_learning.cache_ml_data import load_cached_ml_data
 from market_data.feature.impl.common import SequentialFeatureParam
@@ -186,6 +186,7 @@ def create_split_moving_forward(
     export_mode: EXPORT_MODE,
     aggregation_mode: AGGREGATION_MODE,
     time_range: market_data.util.time.TimeRange,
+    feature_label_params: Optional[List[Union[str, Tuple[str, Any]]]] = None,
     target_params: Optional[market_data.target.target.TargetParamsBatch] = None,
     resample_params: Optional[market_data.machine_learning.resample.ResampleParams] = None,
     seq_params: Optional[SequentialFeatureParam] = None,
@@ -237,6 +238,7 @@ def create_split_moving_forward(
             export_mode=export_mode,
             aggregation_mode=aggregation_mode,
             time_range=time_range,
+            feature_label_params=feature_label_params,
             target_params_batch=target_params,
             resample_params=resample_params,
             seq_params=seq_params,

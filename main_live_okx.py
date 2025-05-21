@@ -4,6 +4,8 @@ import asyncio
 import logging
 import signal
 import sys
+import os
+from datetime import datetime
 import setup_env # needed for the environment variables
 import ml_trading.live_trading.trade_execution.execution_okx
 from ml_trading.streaming.candle_reader.live_okx_native import LiveOkxStreamReader, LiveOkxStreamReaderParams
@@ -11,10 +13,36 @@ from ml_trading.models.updater import ModelUpdaterParams
 import main_util
 
 
+def setup_logging():
+    """
+    Set up logging configuration with both file and console handlers.
+    """
+    # Create logs directory if it doesn't exist
+    os.makedirs('logs', exist_ok=True)
+    
+    # Create a timestamp for the log file
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = f'logs/live_okx_{timestamp}.log'
+    
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    
+    return logging.getLogger(__name__)
+
+
 def main():
     """
     Main function for the trading application.
     """
+    logger = setup_logging()
+    
     parser = argparse.ArgumentParser(description='ML Trading Application')
     parser.add_argument('--betsize', type=float, default=100.0, help='Set target bet size (default: %(default)s)')
     parser.add_argument('--dryrun', action='store_true', help='Run in dryrun mode')
@@ -71,11 +99,11 @@ def main():
     if args.resample_params:
         resample_params = main_util.parse_resample_params(args.resample_params)
     
-    print(f"Running with settings:")
-    print(f"Trade Execution: {okx_trade_execution_params}")
-    print(f"Stream Reader: SSL verify: {args.ssl_verify}")
+    logger.info("Running with settings:")
+    logger.info(f"Trade Execution: {okx_trade_execution_params}")
+    logger.info(f"Stream Reader: SSL verify: {args.ssl_verify}")
     if model_updater_params:
-        print(f"Model: {model_updater_params.model_id} ({model_updater_params.model_registry_label})")
+        logger.info(f"Model: {model_updater_params.model_id} ({model_updater_params.model_registry_label})")
     
     client = LiveOkxStreamReader(
         okx_trade_execution_params,
@@ -86,7 +114,7 @@ def main():
     
     # Set up shutdown handlers
     async def shutdown_handler(signum, frame):
-        print("Shutting down...")
+        logger.info("Shutting down...")
         await client.shutdown()
         
     def signal_handler(signum, frame):
