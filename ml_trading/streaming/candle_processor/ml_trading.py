@@ -122,7 +122,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
             for col in feature_df.columns:
                 feature_dict[col] = feature_df[col].values
 
-        features_df = pd.DataFrame(feature_dict)
+        features_df = pd.DataFrame(feature_dict)[self.model.columns]
         t2 = time.time()
         print(f"Time taken to calculate features: {t2 - t1} seconds")
 
