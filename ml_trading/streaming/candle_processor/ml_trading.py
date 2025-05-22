@@ -126,7 +126,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         t2 = time.time()
         print(f"Time taken to calculate features: {t2 - t1} seconds")
 
-        logging.info(f"features_df: {features_df}\nfeatures values: {features_df.values}")
+        logging.info(f"features_df: {features_df}\nfeatures values: {features_df.values}\n")
         prediction = self.model.predict(features_df.values)
         print(f"{prediction=}")
 
