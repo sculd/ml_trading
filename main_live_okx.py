@@ -25,17 +25,20 @@ def setup_logging():
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_file = f'logs/live_okx_{timestamp}.log'
     
-    # Configure logging
+    # Configure logging with immediate flushing
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(log_file),
+            logging.FileHandler(log_file, mode='w', encoding='utf-8', delay=False),
             logging.StreamHandler(sys.stdout)
-        ]
+        ],
+        force=True
     )
     
-    return logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Logging initialized. Log file: {log_file}")
+    return logger
 
 logger = setup_logging()
 
