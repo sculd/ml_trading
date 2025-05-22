@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+from typing import Optional
 import asyncio
 import logging
 import signal
@@ -36,13 +37,77 @@ def setup_logging():
     
     return logging.getLogger(__name__)
 
+logger = setup_logging()
+
+
+def run_live(
+        betsize: float,
+        leverage: float,
+        dryrun: bool,
+        ssl_verify: bool,
+        resample_params_str: Optional[str] = None,
+        model_id: Optional[str] = None,
+        model_class_id: Optional[str] = None,
+        score_threshold: Optional[float] = None,
+):
+    # Configure trade execution parameters
+    okx_trade_execution_params = ml_trading.live_trading.trade_execution.execution_okx.OkxTradeExecutionParams(
+        target_betsize=betsize,
+        leverage=leverage,
+        is_dry_run=dryrun,
+    )
+    
+    # Only create model updater params if both model arguments are provided
+    model_updater_params = None
+    if model_id and model_class_id:
+        model_updater_params = ModelUpdaterParams(
+            model_id=model_id,
+            model_registry_label=model_class_id,
+            score_threshold=score_threshold,
+        )
+
+    # Configure stream reader parameters
+    reader_params = LiveOkxStreamReaderParams(
+        disable_ssl_verify=not ssl_verify
+    )
+
+    # Parse resample parameters
+    resample_params = None
+    if resample_params_str:
+        resample_params = main_util.parse_resample_params(resample_params_str)
+    
+    logger.info("Running with settings:")
+    logger.info(f"Trade Execution: {okx_trade_execution_params}")
+    logger.info(f"Stream Reader: SSL verify: {ssl_verify}")
+    if model_updater_params:
+        logger.info(f"Model: {model_updater_params.model_id} ({model_updater_params.model_registry_label})")
+    
+    client = LiveOkxStreamReader(
+        okx_trade_execution_params,
+        updater_params=model_updater_params,
+        reader_params=reader_params,
+        resample_params=resample_params,
+        )
+    
+    # Set up shutdown handlers
+    async def shutdown_handler(signum, frame):
+        logger.info("Shutting down...")
+        await client.shutdown()
+        
+    def signal_handler(signum, frame):
+        asyncio.create_task(shutdown_handler(signum, frame))
+        
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Run the client
+    asyncio.run(client.connect())
+
 
 def main():
     """
     Main function for the trading application.
     """
-    logger = setup_logging()
-    
     parser = argparse.ArgumentParser(description='ML Trading Application')
     parser.add_argument('--betsize', type=float, default=100.0, help='Set target bet size (default: %(default)s)')
     parser.add_argument('--dryrun', action='store_true', help='Run in dryrun mode')
@@ -73,58 +138,29 @@ def main():
     if (args.model_id is None) != (args.model_class_id is None):
         parser.error("Both --model-id and --model-class-id must be provided together")
     
-    # Configure trade execution parameters
-    okx_trade_execution_params = ml_trading.live_trading.trade_execution.execution_okx.OkxTradeExecutionParams(
-        target_betsize=args.betsize,
-        leverage=args.leverage,
-        is_dry_run=args.dryrun,
+    run_live(
+        args.betsize,
+        args.leverage,
+        args.dryrun,
+        args.ssl_verify,
+        resample_params_str = args.resample_params,
+        model_id = args.model_id,
+        model_class_id = args.model_class_id,
+        score_threshold = args.score_threshold,
     )
-    
-    # Only create model updater params if both model arguments are provided
-    model_updater_params = None
-    if args.model_id and args.model_class_id:
-        model_updater_params = ModelUpdaterParams(
-            model_id=args.model_id,
-            model_registry_label=args.model_class_id,
-            score_threshold=args.score_threshold,
-        )
-
-    # Configure stream reader parameters
-    reader_params = LiveOkxStreamReaderParams(
-        disable_ssl_verify=not args.ssl_verify
-    )
-
-    # Parse resample parameters
-    resample_params = None
-    if args.resample_params:
-        resample_params = main_util.parse_resample_params(args.resample_params)
-    
-    logger.info("Running with settings:")
-    logger.info(f"Trade Execution: {okx_trade_execution_params}")
-    logger.info(f"Stream Reader: SSL verify: {args.ssl_verify}")
-    if model_updater_params:
-        logger.info(f"Model: {model_updater_params.model_id} ({model_updater_params.model_registry_label})")
-    
-    client = LiveOkxStreamReader(
-        okx_trade_execution_params,
-        updater_params=model_updater_params,
-        reader_params=reader_params,
-        resample_params=resample_params,
-        )
-    
-    # Set up shutdown handlers
-    async def shutdown_handler(signum, frame):
-        logger.info("Shutting down...")
-        await client.shutdown()
-        
-    def signal_handler(signum, frame):
-        asyncio.create_task(shutdown_handler(signum, frame))
-        
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    
-    # Run the client
-    asyncio.run(client.connect())
 
 if __name__ == "__main__":
+    # for debugging
+    '''
+    run_live(
+        betsize=100,
+        leverage=5,
+        dryrun=True,
+        ssl_verify=False,
+        resample_params_str="close,0.03",
+        model_id = "xgboost_testrun_frequent",
+        model_class_id = "xgboost",
+        score_threshold = 0.5,
+    )
+    '''
     main() 

@@ -125,9 +125,6 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         features_df = pd.DataFrame(feature_dict)
         t2 = time.time()
         print(f"Time taken to calculate features: {t2 - t1} seconds")
-        ema_columns = [c for c in features_df.columns if 'ema' in c]
-        volume_ratio_columns = [c for c in features_df.columns if 'volume_ratio' in c]
-        features_df = features_df.drop(columns=ema_columns + volume_ratio_columns + ['bb_width', 'obv_pct_change'])
 
         prediction = self.model.predict(features_df.values)
         print(f"{prediction=}")
