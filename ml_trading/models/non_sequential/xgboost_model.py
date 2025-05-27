@@ -10,7 +10,9 @@ import ml_trading.models.model
 import os
 from ml_trading.models.registry import register_model, register_train_function
 
-@register_model("xgboost")
+_model_label = "xgboost"
+
+@register_model(_model_label)
 class XGBoostModel(ml_trading.models.model.Model):
     def __init__(
         self, 
@@ -54,7 +56,7 @@ class XGBoostModel(ml_trading.models.model.Model):
             xgb_model=xgb_model
         )
 
-@register_train_function("xgboost")
+@register_train_function(_model_label)
 def train_xgboost_model(
     train_df: pd.DataFrame,
     target_column: str,
@@ -107,7 +109,8 @@ def train_xgboost_model(
             'n_estimators': 100,
             'subsample': 0.8,
             'colsample_bytree': 0.8,
-            'random_state': random_state
+            'random_state': random_state,
+            'tree_method': 'exact'
         }
     
     # Initialize and train the model
