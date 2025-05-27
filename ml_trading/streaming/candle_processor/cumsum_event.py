@@ -12,8 +12,8 @@ class CumsumEventBasedProcessor(base.CandleProcessorBase):
         self.purge_params = purge_params
         self.events = []
 
-    def new_series(self):
-        return CumsumEventSeries(self.windows_size, self.resample_params, self.purge_params)
+    def new_series(self, symbol):
+        return CumsumEventSeries(self.windows_size, self.resample_params, self.purge_params, symbol)
 
     def on_new_minutes(self, symbol, timestamp_epoch_seconds, candle):
         result = self.serieses[symbol].is_event()
@@ -32,8 +32,8 @@ class CumsumEventBasedProcessor(base.CandleProcessorBase):
 
 
 class CumsumEventSeries(base.Series):
-    def __init__(self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams):
-        super().__init__(windows_size)
+    def __init__(self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams, symbol: str):
+        super().__init__(windows_size, symbol)
         self.resample_params = resample_params
         self.purge_params = purge_params
         self.s_pos = 0

@@ -1,7 +1,12 @@
 import pandas as pd, numpy as np
 import datetime, time
+import os
+import csv
 from collections import defaultdict, deque, namedtuple
 import logging
+
+# Private module-level cache directory
+_cache_dir = "series_cache"
 
 OHLCVCandle = namedtuple('OHLCVCandle', ['open', 'high', 'low', 'close', 'volume'])
 
@@ -19,10 +24,11 @@ class CandleProcessorBase:
         self.serieses = {} # by symbol
         self.windows_size = windows_size
         self.latest_timestamp_epoch_seconds_truncated_daily = 0
+        os.makedirs(_cache_dir, exist_ok=True)
 
     def on_candle(self, timestamp_epoch_seconds, symbol, open_, high_, low_, close_, volume):
         if symbol not in self.serieses:
-            self.serieses[symbol] = self.new_series()
+            self.serieses[symbol] = self.new_series(symbol)
         
         candle = OHLCVCandle(open_, high_, low_, close_, volume)
         result = self.serieses[symbol].on_candle(timestamp_epoch_seconds, candle)
@@ -40,8 +46,8 @@ class CandleProcessorBase:
             self.serieses[symbol].append(timestamp_epoch_seconds, candle)
 
     # override this
-    def new_series(self):
-        return Series(self.windows_size)
+    def new_series(self, symbol):
+        return Series(self.windows_size, symbol)
 
     # override this
     def on_new_minutes(self, symbol, timestamp_epoch_seconds, candle):
@@ -53,10 +59,72 @@ def truncate_epoch_seconds_at_minute(timestamp_epoch_seconds):
 
 
 class Series:
-    def __init__(self, window_size):
+    def __init__(self, window_size, symbol):
         self.window_size = window_size
+        self.symbol = symbol
+        self.cache_file = os.path.join(_cache_dir, f"{symbol.replace('/', '_').replace('-', '_')}.csv")
         self.series = deque()
         self.latest_timestamp_epoch_seconds = 0
+        
+        # Load cached data if available
+        self._load_cache()
+
+    def _load_cache(self):
+        """Load cached data from file if it exists"""
+        if os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, 'r', newline='') as f:
+                    reader = csv.reader(f)
+                    next(reader)  # Skip header row
+                    
+                    # Read all rows first, then take the last window_size entries
+                    rows = list(reader)
+                    
+                logging.info(f"Loading {len(rows)} cached candles for {self.symbol}")
+                
+                # Keep only the most recent window_size entries
+                for row in rows[-self.window_size:]:
+                    if len(row) >= 6:  # Ensure we have all required fields
+                        candle = OHLCVCandle(
+                            open=float(row[1]),
+                            high=float(row[2]),
+                            low=float(row[3]),
+                            close=float(row[4]),
+                            volume=float(row[5])
+                        )
+                        self.series.append((int(row[0]), candle))
+                
+                if self.series:
+                    self.latest_timestamp_epoch_seconds = self.series[-1][0]
+                    
+            except Exception as e:
+                logging.warning(f"Failed to load cache for {self.symbol}: {e}")
+
+    def _save_cache(self):
+        """Save current series data to cache file"""
+        if not self.series:
+            return
+            
+        try:
+            with open(self.cache_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                
+                # Write header
+                writer.writerow(['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                
+                # Write data rows
+                for timestamp, candle in self.series:
+                    writer.writerow([
+                        timestamp,
+                        candle.open,
+                        candle.high,
+                        candle.low,
+                        candle.close,
+                        candle.volume
+                    ])
+            
+        except Exception as e:
+            logging.warning(f"Failed to save cache for {self.symbol}: {e}")
 
     def on_candle(self, timestamp_epoch_seconds, candle: OHLCVCandle):
         if timestamp_epoch_seconds >= 1718674980:
@@ -95,7 +163,8 @@ class Series:
 
     # override this
     def on_new_minute(self, timestamp_epoch_seconds: int):
-        pass
+        # Save cache whenever a new minute is processed
+        self._save_cache()
 
     def to_pandas(self, symbol: str, symbol_in_index: bool = False):
         """
