@@ -13,7 +13,7 @@ def main():
     parser.add_argument("--action", type=str, choices=["list", "upload", "download"], default="list", 
                         help="Action to perform: list, upload, or download")
     parser.add_argument("--model-id", type=str, help="Name of the model from registry to use")
-    parser.add_argument("--model-class-id", type=str, help="Model class identifier (e.g., 'xgboost', 'lightgbm') to use for model identification")
+    parser.add_argument("--model-class-id", type=str, help="Model class identifier (e.g., 'xgboost', 'lightgbm') to use for model identification (required for download)")
     
     # Parse arguments
     args = parser.parse_args()
@@ -53,24 +53,28 @@ def main():
         else:
             print("Local models directory not found.")
 
-    elif args.action in ["upload", "download"]:
-        # Check required arguments for non-list actions
+    elif args.action == "upload":
+        # Check required arguments for upload action
         if not args.model_id:
-            print("Error: For upload/download actions, --model-id is required")
+            print("Error: For upload action, --model-id is required")
+            return
+            
+        # Handle upload action
+        print(f"Performing upload action")
+        model_manager.upload_model(args.model_id)
+        
+    elif args.action == "download":
+        # Check required arguments for download action
+        if not args.model_id:
+            print("Error: For download action, --model-id is required")
             return
         if not args.model_class_id:
-            print("Error: For upload/download actions, --model-class-id is required")
+            print("Error: For download action, --model-class-id is required")
             return
             
-        if args.action == "upload":
-            # Handle upload action
-            print(f"Performing upload action")
-            model_manager.upload_model(args.model_id, model_class)
-            
-        elif args.action == "download":
-            # Handle download action
-            print(f"Performing download action")
-            model_manager.download_model(args.model_id, model_class)
+        # Handle download action
+        print(f"Performing download action")
+        model_manager.download_model(args.model_id, model_class)
      
 if __name__ == "__main__":
     main() 

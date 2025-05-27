@@ -94,54 +94,51 @@ class ModelManager:
     def upload_model(
             self, 
             model_id: str,
-            model_class: Type[MLTradingModel],
             ) -> bool:
         """
-        Upload a model and its metadata to GCS.
-        
-        Uses temporary directory to detect model type by examining which files are created
-        when model is saved.
+        Upload all files from the local model directory to GCS.
         
         Args:
             model_id: Path/name identifier for the model (e.g., 'xgboost_btc_1h')
-            model_class: Model class to use for instantiation
             
         Returns:
             bool: True if upload successful, False otherwise
         """
         try:
-            model = self.load_model_from_local(model_id, model_class)
-            if model is None:
-                logging.error(f"Model not found in local directory: {model_id}")
+            # Check if local model directory exists
+            local_model_dir = os.path.join(LOCAL_MODEL_DIR_BASE, model_id)
+            if not os.path.exists(local_model_dir):
+                logging.error(f"Local model directory not found: {local_model_dir}")
                 return False
             
-            # Create a temporary directory to determine model type
-            with tempfile.TemporaryDirectory() as temp_dir:
-                # Save model in temporary directory to see what files it creates
-                temp_filename = os.path.join(temp_dir, model_id)
+            # Get all files in the model directory
+            model_files = []
+            for file_name in os.listdir(local_model_dir):
+                file_path = os.path.join(local_model_dir, file_name)
+                if os.path.isfile(file_path):
+                    model_files.append(file_path)
+            
+            if not model_files:
+                logging.error(f"No files found in model directory: {local_model_dir}")
+                return False
+            
+            logging.info(f"Found {len(model_files)} files to upload: {[os.path.basename(f) for f in model_files]}")
+            
+            # Upload all files directly to GCS
+            for file_path in model_files:
+                # Extract the filename from the file path
+                file_name = os.path.basename(file_path)
                 
-                # Use model's save method without checking if it exists
-                model.save(temp_filename)
+                # Create the GCS blob path
+                blob_path = f"{model_id}/{file_name}"
                 
-                # Get a list of all files created during save
-                created_files = glob.glob(f"{temp_dir}/*")
-                logging.info(f"Created files: {created_files}")
-                
-                # Upload all files directly from temp directory to GCS
-                for file_path in created_files:
-                    # Extract the suffix from the original filename
-                    file_suffix = os.path.basename(file_path)
-                    
-                    # Create the GCS blob path
-                    blob_path = f"{model_id}/{file_suffix}"
-                    
-                    # Upload to GCS
-                    blob = self.bucket.blob(blob_path)
-                    blob.upload_from_filename(file_path)
-                    logging.info(f"Uploaded {file_path} to gs://{self.bucket_name}/{blob_path}")
-                
-                logging.info(f"Model successfully uploaded to gs://{self.bucket_name}/{model_id}")
-                return True
+                # Upload to GCS
+                blob = self.bucket.blob(blob_path)
+                blob.upload_from_filename(file_path)
+                logging.info(f"Uploaded {file_path} to gs://{self.bucket_name}/{blob_path}")
+            
+            logging.info(f"Model successfully uploaded to gs://{self.bucket_name}/{model_id}")
+            return True
             
         except Exception as e:
             logging.error(f"Error uploading model to GCS: {str(e)}")
