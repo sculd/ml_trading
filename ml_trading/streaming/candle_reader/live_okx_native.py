@@ -81,6 +81,9 @@ class LiveOkxStreamReader:
                 param=updater_params,
             )
             model = self.model_updater.model
+            threshold = updater_params.score_threshold
+        else:
+            threshold = 0.5
 
         resample_params = resample_params or resample.ResampleParams()
         okx_live_trade_execution = ml_trading.live_trading.trade_execution.execution_okx.TradeExecution(okx_trade_execution_params)
@@ -91,7 +94,7 @@ class LiveOkxStreamReader:
                 purge_period=datetime.timedelta(minutes=30)
             ),
             model=model,
-            threshold=updater_params.score_threshold,
+            threshold=threshold,
             live_trade_execution=okx_live_trade_execution,
         )
         self.ws = None

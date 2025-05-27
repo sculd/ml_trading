@@ -35,7 +35,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         else:
             self.feature_labels_params = parse_feature_label_params(None)
         warmup_period = get_warmup_period(self.feature_labels_params)
-        warmup_minutes = warmup_period.total_seconds() // 60
+        warmup_minutes = warmup_period.total_seconds() // 60 + 1 # +1 to ensure we have enough data to make a prediction
         super().__init__(warmup_minutes, resample_params, purge_params)
 
         self.model = model

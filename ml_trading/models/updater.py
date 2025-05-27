@@ -12,7 +12,7 @@ class ModelUpdaterParams:
     model_id: str
     # model registry label is the name of a model class as it appears in the registry
     model_registry_label: str
-    score_threshold: float
+    score_threshold: float = 0.5
 
 class ModelUpdater:
     def __init__(self, param: ModelUpdaterParams):
