@@ -59,7 +59,7 @@ def truncate_epoch_seconds_at_minute(timestamp_epoch_seconds):
 
 
 class Series:
-    def __init__(self, window_size, symbol):
+    def __init__(self, window_size: int, symbol: str):
         self.window_size = window_size
         self.symbol = symbol
         self.cache_file = os.path.join(_cache_dir, f"{symbol.replace('/', '_').replace('-', '_')}.csv")
@@ -83,7 +83,9 @@ class Series:
                 logging.info(f"Loading {len(rows)} cached candles for {self.symbol}")
                 
                 # Keep only the most recent window_size entries
-                for row in rows[-self.window_size:]:
+                # Ensure window_size is an integer for slicing
+                window_size = int(self.window_size)
+                for row in rows[-window_size:]:
                     if len(row) >= 6:  # Ensure we have all required fields
                         candle = OHLCVCandle(
                             open=float(row[1]),
@@ -113,9 +115,9 @@ class Series:
                 writer.writerow(['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                 
                 # Write data rows
-                for timestamp, candle in self.series:
+                for timestamp_epoch_seconds, candle in self.series:
                     writer.writerow([
-                        timestamp,
+                        timestamp_epoch_seconds,
                         candle.open,
                         candle.high,
                         candle.low,
@@ -127,9 +129,6 @@ class Series:
             logging.warning(f"Failed to save cache for {self.symbol}: {e}")
 
     def on_candle(self, timestamp_epoch_seconds, candle: OHLCVCandle):
-        if timestamp_epoch_seconds >= 1718674980:
-            timestamp_epoch_seconds = timestamp_epoch_seconds
-
         #print(f'on_candle {timestamp}, {symbol}, {open_}, {high_}, {low_}, {close_}, {volume}')
         is_new_minute = False
         if len(self.series) == 0:
