@@ -93,7 +93,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
 
         t1 = time.time()
         feature_dict = {}
-        logger.info(f"feature labels: {', '.join([feature_label, _ in self.feature_labels_params])}")
+        logger.info(f"feature labels: {', '.join([feature_label for feature_label, _ in self.feature_labels_params])}")
             
         for feature_label_param in self.feature_labels_params:
             feature_label, feature_params = feature_label_param
