@@ -118,6 +118,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
             # Keep only the row corresponding to the given timestamp and symbol
             timestamp = pd.Timestamp(epoch_seconds_prev_minute, unit='s', tz='America/New_York')
             feature_df = feature_df[(feature_df.index.get_level_values('timestamp') == timestamp) & (feature_df.index.get_level_values('symbol') == symbol)]
+            feature_df = feature_df.tail(1)
             
             for col in feature_df.columns:
                 feature_dict[col] = feature_df[col].values

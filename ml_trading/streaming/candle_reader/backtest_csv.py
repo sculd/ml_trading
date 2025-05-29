@@ -12,7 +12,12 @@ import logging
 
 
 class CSVCandleReader:
-    def __init__(self, history_filename, model: ml_trading.models.model.Model = None):
+    def __init__(
+            self, 
+            history_filename, 
+            model: ml_trading.models.model.Model = None,
+            resample_params: resample.ResampleParams = None,
+            ):
         self.df_prices_history = self._read_file(history_filename)
         self.iterrows = self.df_prices_history.iterrows()
         self.history_read_i = 0
@@ -26,14 +31,16 @@ class CSVCandleReader:
             )
         )
 
+        resample_params = resample_params or resample.ResampleParams()
+
         self.candle_processor = ml_trading.streaming.candle_processor.ml_trading.MLTradingProcessor(
-            resample_params=resample.ResampleParams(),
+            resample_params=resample_params,
             purge_params=validation_data.PurgeParams(
                 purge_period=datetime.timedelta(minutes=30)
             ),
             model=model,
-            threshold=0.7,
-        )
+            threshold=0.5,
+        )       
 
         logging.info(f'Price data loaded from {history_filename} with {len(self.df_prices_history)} rows')
 
