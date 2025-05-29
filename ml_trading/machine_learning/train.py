@@ -10,6 +10,7 @@ import market_data.util.time
 import market_data.machine_learning.resample
 
 import market_data.machine_learning.cache_ml_data
+import market_data.feature.registry
 from ml_trading.models.registry import get_train_function_by_label
 
 
@@ -67,7 +68,7 @@ class TrainingParams:
 
 def _get_train_df(training_params: TrainingParams):
     if training_params.training_time_range is not None:
-        return market_data.machine_learning.cache_ml_data.load_cached_ml_data(
+        train_df = market_data.machine_learning.cache_ml_data.load_cached_ml_data(
             market_data.ingest.bq.common.DATASET_MODE.OKX, market_data.ingest.bq.common.EXPORT_MODE.BY_MINUTE, market_data.ingest.bq.common.AGGREGATION_MODE.TAKE_LASTEST,
             time_range=training_params.get_time_range(),
             resample_params = training_params.resample_params,
@@ -120,9 +121,34 @@ def _get_train_df(training_params: TrainingParams):
 
         # Take only the required number of samples from the end
         train_df = train_df.tail(training_params.training_set_size)
-        return train_df
     else:
         raise ValueError("Must specify either training_time_range or training_set_size")
+    
+    # Filter columns based on feature_labels
+    # Get all columns except 'symbol' and label columns
+    all_columns = [col for col in train_df.columns if col != 'symbol' and not col.startswith('label_')]
+    
+    # Find which feature labels correspond to each column
+    column_to_feature_map = market_data.feature.registry.find_features_for_columns(all_columns)
+    
+    # Collect columns that belong to the desired feature labels
+    selected_columns = ['symbol']  # Always include symbol
+    for feature_label, columns in column_to_feature_map.items():
+        if feature_label not in training_params.feature_labels:
+            continue
+        for c in columns:
+            if c in selected_columns:
+                continue
+            selected_columns.append(c)
+    
+    # Add back all label columns (targets)
+    label_columns = [col for col in train_df.columns if col.startswith('label_')]
+    selected_columns.extend(label_columns)
+    
+    # Filter the dataframe to only include selected columns
+    train_df = train_df[selected_columns]
+    
+    return train_df
 
 
 def train_model(training_params: TrainingParams):
