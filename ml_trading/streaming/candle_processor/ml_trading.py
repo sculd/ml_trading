@@ -127,18 +127,18 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
 
         features_df = pd.DataFrame(feature_dict)[self.model.columns]
         t2 = time.time()
-        print(f"Time taken to calculate features: {t2 - t1} seconds")
+        logging.info(f"Time taken to calculate features: {t2 - t1} seconds")
 
         logging.info(f"features_df: {features_df}\ncolumns: {features_df.columns}\nfeatures values: {features_df.values}\n")
         prediction = self.model.predict(features_df.values)
-        print(f"{prediction=}")
+        logging.info(f"{prediction=}")
 
         if prediction > self.threshold:
-            print(f"Prediction {prediction} is greater than threshold {self.threshold}, buying {symbol}")
+            logging.info(f"Prediction {prediction} is greater than threshold {self.threshold}, buying {symbol}")
             self.pnl.enter(symbol, timestamp_epoch_seconds, 'long', (candle.open + candle.close) / 2)
         elif prediction < -self.threshold:
-            print(f"Prediction {prediction} is less than threshold -{self.threshold}, selling {symbol}")
+            logging.info(f"Prediction {prediction} is less than threshold -{self.threshold}, selling {symbol}")
             self.pnl.enter(symbol, timestamp_epoch_seconds, 'short', (candle.open + candle.close) / 2)
         else:
-            print(f"Prediction {prediction} is between threshold {self.threshold} and -{self.threshold}, no action for {symbol}")
+            logging.info(f"Prediction {prediction} is between threshold {self.threshold} and -{self.threshold}, no action for {symbol}")
 
