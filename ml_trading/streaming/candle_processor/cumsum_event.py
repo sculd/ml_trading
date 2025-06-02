@@ -3,6 +3,7 @@ import numpy as np
 import market_data.machine_learning.resample as resample
 import ml_trading.machine_learning.validation_data as validation_data
 import ml_trading.streaming.candle_processor.base as base
+import logging
 
 
 class CumsumEventBasedProcessor(base.CandleProcessorBase):
@@ -40,6 +41,24 @@ class CumsumEventSeries(base.Series):
         self.s_neg = 0
         self.last_pct_change = 0
         self.latest_valid_event_timestamp_epoch_seconds_truncated_minutely = 0
+        self.current_date_et = None  # Track current date in ET timezone
+
+    def on_new_minute(self, timestamp_epoch_seconds: int):
+        # Call parent method first to handle caching
+        super().on_new_minute(timestamp_epoch_seconds)
+        
+        # Convert timestamp to ET timezone and get the date
+        et_timestamp = pd.Timestamp(timestamp_epoch_seconds, unit='s', tz='America/New_York')
+        current_date = et_timestamp.date()
+        
+        # Check if we've moved to a new date in ET timezone
+        if self.current_date_et is not None and current_date != self.current_date_et:
+            logging.info(f"New date detected in ET timezone for {self.symbol}: {self.current_date_et} -> {current_date}. Resetting s_pos and s_neg.")
+            self.s_pos = 0
+            self.s_neg = 0
+        
+        # Update the current date
+        self.current_date_et = current_date
 
     def get_last_candle(self):
         if len(self.series) == 0:
