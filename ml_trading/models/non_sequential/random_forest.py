@@ -102,11 +102,11 @@ def train_random_forest_model(
     # Default Random Forest parameters if none provided
     if rf_params is None:
         rf_params = {
-            'n_estimators': 100,
+            'n_estimators': 50,
             'max_depth': 10,
             'min_samples_split': 5,
             'min_samples_leaf': 2,
-            'max_features': 'sqrt',
+            'max_features': 'log2',
             'bootstrap': True,
             'random_state': random_state,
             'n_jobs': -1,  # Use all available cores
