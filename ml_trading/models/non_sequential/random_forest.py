@@ -11,7 +11,7 @@ import ml_trading.models.model
 import os
 from ml_trading.models.registry import register_model, register_train_function
 
-_model_label = "random_forest"
+_model_label = "random_forest_regression"
 
 @register_model(_model_label)
 class RandomForestModel(ml_trading.models.model.Model):
