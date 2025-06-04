@@ -28,6 +28,9 @@ def get_metrics(y_test: np.ndarray, y_pred: np.ndarray, prediction_threshold: fl
     # Calculate non-zero prediction accuracy (when model makes a directional call)
     non_zero_predictions = y_pred_decision != 0
     non_zero_accuracy = np.mean(correct_prediction[non_zero_predictions]) if np.any(non_zero_predictions) else 0.0
+    non_zero_prediction_labels = (y_pred_decision != 0) & (y_test != 0)
+    non_zero_binary_accuracy = np.mean(correct_prediction[non_zero_prediction_labels]) if np.any(non_zero_prediction_labels) else 0.0
+    non_zero_prediction_with_draw_results = non_zero_predictions & (y_test == 0)
     
     total_positive = len(y_pred_decision[y_test > 0])
     total_neutral = len(y_pred_decision[y_test == 0])
@@ -72,7 +75,9 @@ def get_metrics(y_test: np.ndarray, y_pred: np.ndarray, prediction_threshold: fl
         'r2': r2_score(y_test, y_pred),
         'accuracy': accuracy,
         'non_zero_predictions': len(correct_prediction[non_zero_predictions]),
+        'non_zero_prediction_with_draw_results': len(correct_prediction[non_zero_prediction_with_draw_results]),
         'non_zero_accuracy': non_zero_accuracy,
+        'non_zero_binary_accuracy': non_zero_binary_accuracy,
         'positive_precision': np.sum((y_pred_decision > 0) & (y_test > 0)) / np.sum(y_pred_decision > 0),
         'positive_recall': np.sum((y_pred_decision > 0) & (y_test > 0)) / np.sum(y_test > 0),
         'neutral_precision': np.sum((y_pred_decision == 0) & (y_test == 0)) / np.sum(y_pred_decision == 0),
