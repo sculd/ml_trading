@@ -91,7 +91,7 @@ def train_xgboost_model(
     #print(X_test.info())
     
     # Print target label distribution in test set
-    print("\nTest set target label distribution:")
+    print("Train set target label distribution:")
     total_samples = len(y_train)
     up_samples = np.sum(y_train > 0)
     down_samples = np.sum(y_train < 0)
