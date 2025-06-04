@@ -109,6 +109,9 @@ def train_lightgbm_model(
             'subsample': 0.8,
             'colsample_bytree': 0.8,
             'random_state': random_state,
+            'verbosity': -1,
+            'min_gain_to_split': 1e-3,
+            'min_data_in_leaf': 20,
         }
     
     # Initialize and train the model
