@@ -26,7 +26,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
             resample_params: resample.ResampleParams, 
             purge_params: validation_data.PurgeParams,
             model: Optional[ml_trading.models.model.Model] = None,
-            threshold: float = 0.5,
+            prediction_threshold: float = 0.5,
             target_params: market_data.target.target.TargetParams = market_data.target.target.TargetParams(),
             live_trade_execution = None,
             ):
@@ -39,7 +39,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         super().__init__(warmup_minutes, resample_params, purge_params)
 
         self.model = model
-        self.threshold = threshold
+        self.prediction_threshold = prediction_threshold
         self.target_params = target_params
         self.btc_symbol = None
 
@@ -133,12 +133,14 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
         prediction = self.model.predict(features_df.values)
         logging.info(f"{prediction=}")
 
-        if prediction > self.threshold:
-            logging.info(f"Prediction {prediction} is greater than threshold {self.threshold}, buying {symbol}")
-            self.pnl.enter(symbol, timestamp_epoch_seconds, 'long', (candle.open + candle.close) / 2)
-        elif prediction < -self.threshold:
-            logging.info(f"Prediction {prediction} is less than threshold -{self.threshold}, selling {symbol}")
-            self.pnl.enter(symbol, timestamp_epoch_seconds, 'short', (candle.open + candle.close) / 2)
+        if prediction > self.prediction_threshold:
+            logging.info(f"Prediction {prediction} is greater than threshold {self.prediction_threshold}, buying {symbol}")
+            #self.pnl.enter(symbol, timestamp_epoch_seconds, 'long', (candle.open + candle.close) / 2)
+            self.pnl.enter_with_tp_sl(symbol, timestamp_epoch_seconds, tp_sl_return_size=self.target_params.tp_value, side=1)
+        elif prediction < -self.prediction_threshold:
+            logging.info(f"Prediction {prediction} is less than threshold -{self.prediction_threshold}, selling {symbol}")
+            #self.pnl.enter(symbol, timestamp_epoch_seconds, 'short', (candle.open + candle.close) / 2)
+            self.pnl.enter_with_tp_sl(symbol, timestamp_epoch_seconds, tp_sl_return_size=self.target_params.tp_value, side=-1)
         else:
-            logging.info(f"Prediction {prediction} is between threshold {self.threshold} and -{self.threshold}, no action for {symbol}")
+            logging.info(f"Prediction {prediction} is between threshold {self.prediction_threshold} and -{self.prediction_threshold}, no action for {symbol}")
 

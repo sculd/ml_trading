@@ -2,6 +2,11 @@ import logging, os, requests
 from collections import defaultdict
 from dataclasses import dataclass
 import ml_trading.live_trading.publish.telegram
+import hmac
+import hashlib
+import base64
+import json
+from datetime import datetime
 
 _flag = "0"  # live trading: 0, demo trading: 1
 _api_key = os.environ['OKX_API_KEY']
@@ -42,6 +47,101 @@ def get_current_price(symbol):
     r_js = r.json()
     price = float(r_js['data'][0][4])
     return price
+
+
+def get_price_precision(tick_size):
+    """
+    Determine the number of decimal places from tick size.
+    
+    Args:
+        tick_size (str): The minimum price increment as a string (e.g., "0.01", "0.1", "1")
+    
+    Returns:
+        int: Number of decimal places
+    """
+    if '.' in tick_size:
+        return len(tick_size.split('.')[1])
+    else:
+        return 0
+
+
+def format_price_with_precision(price, precision):
+    """
+    Format a price to the specified number of decimal places.
+    
+    Args:
+        price (float): The price to format
+        precision (int): Number of decimal places
+    
+    Returns:
+        str: Formatted price as string
+    """
+    return f"{price:.{precision}f}"
+
+
+def place_order_with_tp_sl_direct_api(symbol, side, pos_side, sz, tp_trigger_px, sl_trigger_px):
+    """
+    Direct API call to OKX for placing order with TP/SL using HTTP requests.
+    This bypasses the python-okx library limitations.
+    
+    Args:
+        symbol (str): Trading symbol
+        side (str): "buy" or "sell" 
+        pos_side (str): "long" or "short"
+        sz (str): Order size
+        tp_trigger_px (str): Take profit trigger price
+        sl_trigger_px (str): Stop loss trigger price
+    
+    Returns:
+        dict: API response
+    """
+    
+    # OKX API endpoint
+    url = "https://www.okx.com/api/v5/trade/order"
+    
+    # Request body
+    body = {
+        "instId": symbol,
+        "tdMode": "isolated",
+        "side": side,
+        "posSide": pos_side,
+        "ordType": "market",
+        "sz": sz,
+        "tpTriggerPx": tp_trigger_px,
+        "tpTriggerPxType": "last",
+        "tpOrdPx": "-1",  # -1 indicates market order for TP
+        "slTriggerPx": sl_trigger_px,
+        "slTriggerPxType": "last", 
+        "slOrdPx": "-1"   # -1 indicates market order for SL
+    }
+    
+    # Create signature for authentication
+    # OKX requires timestamp in ISO format with exactly 3 decimal places (milliseconds)
+    timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    body_str = json.dumps(body, separators=(',', ':'))
+    message = timestamp + 'POST' + '/api/v5/trade/order' + body_str
+    
+    signature = base64.b64encode(
+        hmac.new(
+            _secret_key.encode('utf-8'),
+            message.encode('utf-8'),
+            hashlib.sha256
+        ).digest()
+    ).decode('utf-8')
+    
+    # Headers
+    headers = {
+        'Content-Type': 'application/json',
+        'OK-ACCESS-KEY': _api_key,
+        'OK-ACCESS-SIGN': signature,
+        'OK-ACCESS-TIMESTAMP': timestamp,
+        'OK-ACCESS-PASSPHRASE': _passphrase,
+        'x-simulated-trading': _flag
+    }
+    
+    # Make request
+    response = requests.post(url, headers=headers, data=body_str)
+    return response.json()
 
 
 @dataclass
@@ -115,7 +215,6 @@ class TradeExecution:
 
         side: +1 for long, -1 for short
         '''
-        direction = 1
         price = get_current_price(symbol)
 
         message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, self.direction: {self.direction_per_symbol[symbol]}'
@@ -154,6 +253,74 @@ class TradeExecution:
                 logging.info(f'Successful order request, order_id: {result["data"][0]["ordId"]}')
             else:
                 logging.error(f'Unsuccessful order request, error_code = {result["data"][0]["sCode"]}, Error_message = {result["data"][0]["sMsg"]}')
+
+        self.direction_per_symbol[symbol] = 1
+
+    def enter_with_tp_sl(self, symbol, epoch_seconds, tp_sl_return_size: float, side):
+        '''
+        negative weight meaning short-selling.
+
+        tp_sl_return_size: ex. 0.05 means 5% take profit and stop loss.
+        side: +1 for long, -1 for short
+        '''
+        price = get_current_price(symbol)
+
+        message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, self.direction: {self.direction_per_symbol[symbol]}'
+        logging.info(message)
+        ml_trading.live_trading.publish.telegram.post_message(message)
+
+        if self.direction_per_symbol[symbol] == 1:
+            return
+    
+        self.setup_leverage(symbol)
+
+        trade_api = get_trade_api()
+
+        # Get tick size and determine price precision for the symbol
+        tick_size = self.inst_data[symbol]['tickSz']
+        price_precision = get_price_precision(tick_size)
+
+        if side > 0:
+            tpTriggerPx = price * (1 + tp_sl_return_size)
+            slTriggerPx = price * (1 - tp_sl_return_size)
+        else:
+            tpTriggerPx = price * (1 - tp_sl_return_size)
+            slTriggerPx = price * (1 + tp_sl_return_size)
+        
+        # Format trigger prices with the same precision as the instrument's tick size
+        tpTriggerPx_formatted = format_price_with_precision(tpTriggerPx, price_precision)
+        slTriggerPx_formatted = format_price_with_precision(slTriggerPx, price_precision)
+        
+        logging.info(f'TP/SL prices: TP={tpTriggerPx_formatted}, SL={slTriggerPx_formatted} (precision: {price_precision} decimals, tick_size: {tick_size})')
+        
+        # ctVal is the unit of the coin per 1 sz
+        contract_val = float(self.inst_data[symbol]['ctVal'])
+        sz_target = self.target_betsize / price / contract_val
+        sz_target_leveraged = sz_target * self.leverage
+        sz = int(sz_target_leveraged)
+
+        logging.info(f'for {symbol}, target sz: {sz_target}, actual sz: {sz} (leveraged by {self.leverage}), delta: {sz - sz_target}, contract_val: {contract_val}')
+
+        if self.is_dry_run:
+            logging.info("in dryrun mode, not actually make the order requests.")
+        else:
+            try:
+                result = place_order_with_tp_sl_direct_api(
+                    symbol=symbol,
+                    side="buy" if side >= 0 else "sell",
+                    pos_side="long" if side >= 0 else "short", 
+                    sz=str(abs(sz)),
+                    tp_trigger_px=tpTriggerPx_formatted,
+                    sl_trigger_px=slTriggerPx_formatted
+                )
+                logging.info(f'Direct API order result:\n{result}')
+                
+                if result["code"] == "0":
+                    logging.info(f'Successful order with TP/SL, order_id: {result["data"][0]["ordId"]}')
+                else:
+                    logging.error(f'Direct API order failed: {result}')
+            except Exception as e:
+                logging.error(f'Direct API call failed: {e}')
 
         self.direction_per_symbol[symbol] = 1
 
