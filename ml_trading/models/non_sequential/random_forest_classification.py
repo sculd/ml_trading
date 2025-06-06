@@ -11,9 +11,8 @@ import ml_trading.models.model
 import os
 from ml_trading.models.registry import register_model, register_train_function
 
-# Label mappings for the two binary models
-_label_map_positive = {-1: 0, 0: 0, 1: 1}  # +1 vs rest
-_label_map_negative = {-1: 1, 0: 0, 1: 0}  # -1 vs rest
+# Import label mappings from shared location
+from ml_trading.models.model import LABEL_MAP_POSITIVE, LABEL_MAP_NEGATIVE
 
 _model_label = "random_forest_classification"
 
@@ -141,7 +140,7 @@ def train_random_forest_model(
     positive_params['class_weight'] = class_weight_positive
     
     positive_model = RandomForestClassifier(**positive_params)
-    y_positive = y_train.map(_label_map_positive)
+    y_positive = y_train.map(LABEL_MAP_POSITIVE)
     positive_model.fit(X_train.values, y_positive.values)
     
     # Train negative model (-1 vs rest)
@@ -150,7 +149,7 @@ def train_random_forest_model(
     negative_params['class_weight'] = class_weight_negative
     
     negative_model = RandomForestClassifier(**negative_params)
-    y_negative = y_train.map(_label_map_negative)
+    y_negative = y_train.map(LABEL_MAP_NEGATIVE)
     negative_model.fit(X_train.values, y_negative.values)
     
     model = RandomForestClassificationModel(

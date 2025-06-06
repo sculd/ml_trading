@@ -7,6 +7,10 @@ import json
 import ml_trading.machine_learning.util
 from ml_trading.models.util import into_X_y
 
+# Label mappings for dual binary classification models
+LABEL_MAP_POSITIVE = {-1: 0, 0: 0, 1: 1}  # +1 vs rest
+LABEL_MAP_NEGATIVE = {-1: 1, 0: 0, 1: 0}  # -1 vs rest
+
 
 class Model:
     def __init__(
