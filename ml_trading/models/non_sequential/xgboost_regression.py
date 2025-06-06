@@ -130,7 +130,7 @@ def train_xgboost_model(
 
 
 def evaluate_xgboost_model(
-    xgb_model: xgb.XGBRegressor,
+    xgb_model: XGBoostModel,
     validation_df: pd.DataFrame,
     target_column: str,
     forward_return_column: str,

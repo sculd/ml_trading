@@ -130,7 +130,7 @@ def train_lightgbm_model(
 
 
 def evaluate_lightgbm_model(
-    lgb_model: lgb.LGBMRegressor,
+    lgb_model: LightGBMModel,
     validation_df: pd.DataFrame,
     target_column: str,
     forward_return_column: str,

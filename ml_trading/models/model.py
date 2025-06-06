@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List
+from typing import List, Dict, Any
 import os
 import json
 
@@ -9,10 +9,12 @@ class Model:
             model_name: str,
             columns: List[str],
             target: str,
+            other_params: Dict[str, Any] = None,
             ):
         self.model_name = model_name
         self.columns = columns
         self.target = target
+        self.other_params = other_params or {}
 
     # override this
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -31,7 +33,8 @@ class Model:
         metadata = {
             'model_name': self.model_name,
             'columns': self.columns,
-            'target': self.target
+            'target': self.target,
+            'other_params': self.other_params
         }
         
         metadata_filename = f"{model_id}.meta.json"
