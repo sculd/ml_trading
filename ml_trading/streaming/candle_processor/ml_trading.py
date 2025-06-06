@@ -135,12 +135,10 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
 
         if prediction > self.prediction_threshold:
             logging.info(f"Prediction {prediction} is greater than threshold {self.prediction_threshold}, buying {symbol}")
-            #self.pnl.enter(symbol, timestamp_epoch_seconds, 'long', (candle.open + candle.close) / 2)
-            self.pnl.enter_with_tp_sl(symbol, timestamp_epoch_seconds, tp_sl_return_size=self.target_params.tp_value, side=1)
+            self.pnl.enter(symbol, timestamp_epoch_seconds, 'long', (candle.open + candle.close) / 2)
         elif prediction < -self.prediction_threshold:
             logging.info(f"Prediction {prediction} is less than threshold -{self.prediction_threshold}, selling {symbol}")
-            #self.pnl.enter(symbol, timestamp_epoch_seconds, 'short', (candle.open + candle.close) / 2)
-            self.pnl.enter_with_tp_sl(symbol, timestamp_epoch_seconds, tp_sl_return_size=self.target_params.tp_value, side=-1)
+            self.pnl.enter(symbol, timestamp_epoch_seconds, 'short', (candle.open + candle.close) / 2)
         else:
             logging.info(f"Prediction {prediction} is between threshold {self.prediction_threshold} and -{self.prediction_threshold}, no action for {symbol}")
 
