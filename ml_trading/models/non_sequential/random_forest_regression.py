@@ -124,35 +124,3 @@ def train_random_forest_model(
         rf_model=rf_model,
     )
     return model
-
-
-def evaluate_random_forest_model(
-    rf_model: RandomForestRegressor,
-    validation_df: pd.DataFrame,
-    target_column: str,
-    forward_return_column: str,
-    prediction_threshold: float = 0.5
-) -> Tuple[Dict[str, float], pd.DataFrame]:
-    X_test, y_test, forward_return_test, _ = into_X_y(validation_df, target_column, forward_return_column, use_scaler=False)
-    
-    # Print target label distribution in test set
-    print("\nTest set target label distribution:")
-    total_samples = len(y_test)
-    up_samples = np.sum(y_test > 0)
-    down_samples = np.sum(y_test < 0)
-    neutral_samples = np.sum(y_test == 0)
-    
-    print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
-    
-    # Make predictions
-    y_pred = rf_model.predict(X_test.values)
-
-    validation_y_df = pd.DataFrame(index=validation_df.index)
-    validation_y_df['symbol'] = validation_df['symbol']
-    validation_y_df['y'] = y_test.values
-    validation_y_df['pred'] = y_pred
-    validation_y_df['forward_return'] = forward_return_test.values
-    validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
-
-    return ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df
-
