@@ -48,8 +48,7 @@ class ModelUpdater:
         """Load the model from file."""
         try:
             logging.info(f"Loading model {self.model_id} from {self._get_model_file_path()}")
-            model_class = ml_trading.models.registry.get_model_by_label(self.model_registry_label)
-            self.model = model_class.load(self._get_model_file_path())
+            self.model = self.model_class.load(self._get_model_file_path())
             logging.info(f"Successfully loaded model {self.model_id}")
             return True
         except Exception as e:

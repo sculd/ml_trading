@@ -160,10 +160,10 @@ if __name__ == "__main__":
         leverage=5,
         dryrun=True,
         ssl_verify=False,
-        resample_params_str="close,0.03",
-        model_id = "xgboost_testrun_frequent",
-        model_class_id = "xgboost",
-        score_threshold = 0.5,
+        resample_params_str="close,0.1",
+        model_id = "rf_testrun",
+        model_class_id = "random_forest_classification",
+        score_threshold = 0.6,
     )
-    '''
+    #'''
     main() 
