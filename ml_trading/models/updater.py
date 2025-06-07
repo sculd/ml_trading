@@ -25,7 +25,7 @@ class ModelUpdater:
         self.model_id = param.model_id
         self.model_registry_label = param.model_registry_label
         self.last_modified_time = self._get_file_modified_time()
-        self.model_class = ml_trading.models.registry.get_model_by_label(self.model_id)
+        self.model_class = ml_trading.models.registry.get_model_by_label(param.model_registry_label)
         self.model = None
         
         # Load the initial model if file exists
