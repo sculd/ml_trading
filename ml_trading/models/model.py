@@ -115,7 +115,7 @@ class ClassificationModel(Model):
         Logic:
         - If positive_model predicts 1 and negative_model predicts 0 → positive_model probability
         - If positive_model predicts 0 and negative_model predicts 1 → negative negative_model probability  
-        - Otherwise → 0.0 (neutral)
+        - Otherwise → probability with larger amplitude (positive or negative)
         """
         pos_pred = self.positive_model.predict(X)
         neg_pred = self.negative_model.predict(X)
@@ -133,8 +133,14 @@ class ClassificationModel(Model):
         # Negative probability when negative model says yes and positive model says no
         final_pred[(pos_pred == 0) & (neg_pred == 1)] = -neg_proba[(pos_pred == 0) & (neg_pred == 1)]
         
-        # 0.0 (neutral) for all other cases including conflicts
-        # This handles: (0,0), (1,1) cases
+        # For all other cases (including conflicts and neither model confident), 
+        # return the probability with larger amplitude
+        other_cases = ~((pos_pred == 1) & (neg_pred == 0)) & ~((pos_pred == 0) & (neg_pred == 1))
+        
+        # Compare absolute probabilities and choose the larger one with correct sign
+        pos_larger = pos_proba >= neg_proba
+        final_pred[other_cases & pos_larger] = pos_proba[other_cases & pos_larger]
+        final_pred[other_cases & ~pos_larger] = -neg_proba[other_cases & ~pos_larger]
         
         return final_pred
     
