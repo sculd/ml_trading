@@ -53,8 +53,8 @@ class PNLMixin:
         self.positions.append(position)
         self.active_positions[symbol] = position
         if self.live_trade_execution:
-            #self.live_trade_execution.enter(symbol, timestamp_epoch_seconds, 1 if side == 'long' else -1)
-            self.live_trade_execution.enter_with_tp_sl(symbol, timestamp_epoch_seconds, tp_sl_return_size=self.target_params.tp_value, side=1 if side == 'long' else -1)
+            self.live_trade_execution.enter(symbol, timestamp_epoch_seconds, 1 if side == 'long' else -1)
+            #self.live_trade_execution.enter_with_tp_sl(symbol, timestamp_epoch_seconds, tp_sl_return_size=self.target_params.tp_value, side=1 if side == 'long' else -1)
 
 
         return position
