@@ -217,7 +217,7 @@ class TradeExecution:
         '''
         price = get_current_price(symbol)
 
-        message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, self.direction: {self.direction_per_symbol[symbol]}'
+        message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, side: {side}'
         logging.info(message)
         ml_trading.live_trading.publish.telegram.post_message(message)
 
@@ -265,7 +265,7 @@ class TradeExecution:
         '''
         price = get_current_price(symbol)
 
-        message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, self.direction: {self.direction_per_symbol[symbol]}'
+        message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, side: {side}'
         logging.info(message)
         ml_trading.live_trading.publish.telegram.post_message(message)
 
@@ -332,7 +332,7 @@ class TradeExecution:
         '''
         direction = -1
         price = get_current_price(symbol)
-        message = f'[exit] at {epoch_seconds}, for {symbol}, prices: {price}, direction: exit, self.direction: {self.direction_per_symbol[symbol]}'
+        message = f'[exit] at {epoch_seconds}, for {symbol}, prices: {price}, direction: exit'
         logging.info(message)
         ml_trading.live_trading.publish.telegram.post_message(message)
 
