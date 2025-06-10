@@ -108,41 +108,54 @@ class PNLMixin:
         
         if position.side == "long":
             # Check take profit using high price (best case for longs)
-            if prev_minute_candle.high >= position.entry_price * (1 + self.target_params.tp_value):
+            tp_target_price = position.entry_price * (1 + self.target_params.tp_value)
+            if prev_minute_candle.high >= tp_target_price:
                 # If TP hit, use the TP price for exit
-                exit_price = position.entry_price * (1 + self.target_params.tp_value)
+                exit_price = tp_target_price
+                logger.info(f"Long take profit triggered for {symbol}: candle high {prev_minute_candle.high:.6f} >= TP target {tp_target_price:.6f} (entry: {position.entry_price:.6f}, TP%: {self.target_params.tp_value*100:.2f}%)")
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "tp")
                 # Return the exact TP value as the pnl_return
                 return {"position_changed": True, "reason": "tp", "pnl_return": position.pnl_return}
             
             # Check stop loss using low price (worst case for longs)
-            elif prev_minute_candle.low <= position.entry_price * (1 - self.target_params.sl_value):
+            sl_target_price = position.entry_price * (1 - self.target_params.sl_value)
+            if prev_minute_candle.low <= sl_target_price:
                 # If SL hit, use the SL price for exit
-                exit_price = position.entry_price * (1 - self.target_params.sl_value)
+                exit_price = sl_target_price
+                logger.info(f"Long stop loss triggered for {symbol}: candle low {prev_minute_candle.low:.6f} <= SL target {sl_target_price:.6f} (entry: {position.entry_price:.6f}, SL%: {self.target_params.sl_value*100:.2f}%)")
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "sl")
                 # Return the pnl percentage
                 return {"position_changed": True, "reason": "sl", "pnl_return": position.pnl_return}
                 
         else:  # short
             # Check take profit using low price (best case for shorts)
-            if prev_minute_candle.low <= position.entry_price * (1 - self.target_params.tp_value):
+            tp_target_price = position.entry_price * (1 - self.target_params.tp_value)
+            if prev_minute_candle.low <= tp_target_price:
                 # If TP hit, use the TP price for exit
-                exit_price = position.entry_price * (1 - self.target_params.tp_value)
+                exit_price = tp_target_price
+                logger.info(f"Short take profit triggered for {symbol}: candle low {prev_minute_candle.low:.6f} <= TP target {tp_target_price:.6f} (entry: {position.entry_price:.6f}, TP%: {self.target_params.tp_value*100:.2f}%)")
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "tp")
                 # Return the pnl percentage
                 return {"position_changed": True, "reason": "tp", "pnl_return": position.pnl_return}
             
             # Check stop loss using high price (worst case for shorts)
-            elif prev_minute_candle.high >= position.entry_price * (1 + self.target_params.sl_value):
+            sl_target_price = position.entry_price * (1 + self.target_params.sl_value)
+            if prev_minute_candle.high >= sl_target_price:
                 # If SL hit, use the SL price for exit
-                exit_price = position.entry_price * (1 + self.target_params.sl_value)
+                exit_price = sl_target_price
+                logger.info(f"Short stop loss triggered for {symbol}: candle high {prev_minute_candle.high:.6f} >= SL target {sl_target_price:.6f} (entry: {position.entry_price:.6f}, SL%: {self.target_params.sl_value*100:.2f}%)")
                 position = self.exit(symbol, timestamp_epoch_seconds, exit_price, "sl")
                 # Return the pnl percentage
                 return {"position_changed": True, "reason": "sl", "pnl_return": position.pnl_return}
             
         # Check timeout
-        if (timestamp_epoch_seconds - position.entry_epoch_seconds) >= (self.target_params.forward_period * 60):
+        position_duration_seconds = timestamp_epoch_seconds - position.entry_epoch_seconds
+        timeout_seconds = self.target_params.forward_period * 60
+        if position_duration_seconds >= timeout_seconds:
             # For timeout, use the current close price
+            duration_minutes = position_duration_seconds / 60
+            timeout_minutes = timeout_seconds / 60
+            logger.info(f"Position timeout triggered for {symbol}: duration {duration_minutes:.1f} minutes >= timeout {timeout_minutes:.1f} minutes (entry: {position.entry_price:.6f}, exit: {prev_minute_candle.close:.6f})")
             position = self.exit(symbol, timestamp_epoch_seconds, prev_minute_candle.close, "timeout")
             return {"position_changed": True, "reason": "timeout", "pnl_return": position.pnl_return}
             

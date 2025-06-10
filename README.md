@@ -4,10 +4,9 @@ A machine learning framework for algorithmic trading with cryptocurrency exchang
 
 ## Features
 
-- **Machine Learning Models**: Implementation of XGBoost and deep learning models for financial time series prediction
+- **Machine Learning Models**: Implementation of XGBoost and deep learning models for financial time series prediction. See [market_data](https://github.com/sculd/market_data) repository for feature processing and data sampling.
 - **Live Trading**: Real-time trading on OKX exchange using WebSocket API
 - **Backtesting**: Historical data analysis and strategy evaluation
-- **Risk Management**: Position sizing and leverage control
 - **Time Series Processing**: Proper handling of financial data with embargo periods to prevent look-ahead bias
 
 ## Getting Started
