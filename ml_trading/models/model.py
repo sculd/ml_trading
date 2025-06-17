@@ -76,9 +76,9 @@ class Model:
         # Print target label distribution in test set
         print("\nTest set target label distribution:")
         total_samples = len(y_test)
-        up_samples = np.sum(y_test > 0)
-        down_samples = np.sum(y_test < 0)
-        neutral_samples = np.sum(y_test == 0)
+        up_samples = np.sum(y_test >= 1.)
+        down_samples = np.sum(y_test <= -1.0)
+        neutral_samples = np.sum((y_test < 1.) & (y_test > -1.0))
         
         print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
         

@@ -77,8 +77,6 @@ def train_random_forest_model(
     Returns:
         Trained RandomForestModel instance
     """
-    # Drop the symbol column
-
     X_train, y_train, forward_return_train, _ = into_X_y(train_df, target_column, forward_return_column, use_scaler=False)
     
     # Split into train and test sets
@@ -93,9 +91,9 @@ def train_random_forest_model(
     # Print target label distribution in training set
     print("\nTraining set target label distribution:")
     total_samples = len(y_train)
-    up_samples = np.sum(y_train > 0)
-    down_samples = np.sum(y_train < 0)
-    neutral_samples = np.sum(y_train == 0)
+    up_samples = np.sum(y_train >= 1.)
+    down_samples = np.sum(y_train <= -1.0)
+    neutral_samples = np.sum((y_train < 1.) & (y_train > -1.0))
     
     print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
     

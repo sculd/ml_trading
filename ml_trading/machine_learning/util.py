@@ -117,9 +117,11 @@ def calculate_trade_returns(result_df, threshold=0.70):
     # 2. For short positions (pred=-1): return equals the negative of actual value
     # 3. For neutral positions (pred=0): return is 0 (no trade)
     result_df['trade_return'] = 0.0
-    result_df['trade_return'] = np.where((result_df['pred_decision'] > 0) & (result_df['y'] == 1), abs(result_df['pred_decision']), result_df['trade_return'])
-    result_df['trade_return'] = np.where((result_df['pred_decision'] < 0) & (result_df['y'] == -1), abs(result_df['pred_decision']), result_df['trade_return'])
-    result_df['trade_return'] = np.where((result_df['pred_decision'] != 0) & (result_df['y'] != 0) & (result_df['pred_decision'] * result_df['y'] < 0), -np.abs(result_df['pred_decision']), result_df['trade_return'])
+    result_df['trade_return'] = np.where((result_df['pred_decision'] > 0) & (result_df['y'] >= 1), abs(result_df['y']), result_df['trade_return'])
+    result_df['trade_return'] = np.where((result_df['pred_decision'] < 0) & (result_df['y'] <= -1), abs(result_df['y']), result_df['trade_return'])
+    result_df['trade_return'] = \
+        np.where((result_df['pred_decision'] != 0) & (result_df['y'] != 0) & (result_df['pred_decision'] * result_df['y'] < 0), 
+                    -np.abs(result_df['pred_decision']), result_df['trade_return'])
     
     return result_df
 
