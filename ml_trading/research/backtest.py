@@ -363,7 +363,7 @@ class TradeStats:
         print(f"MAE: {self.mae:.4f}, MSE: {self.mse:.4f}, R²(all): {self.r2:.4f}, R²(trades): {self.r2_trades:.4f}")
         print(f"Total trades: {self.total_trades}")
         print(f"Average return per trade: {self.avg_return:.4f}")
-        print(f"Win rate: {self.win_rate:.2%}, loss: {self.loss_rate:.2%}, draw: {self.draw_rate:.2%}")
+        print(f"Trading win rate: {self.win_rate:.2%}, loss: {self.loss_rate:.2%}, draw: {self.draw_rate:.2%}")
         print(f"Positive win rate: {self.positive_win_rate:.2%}, negative win rate: {self.negative_win_rate:.2%}, neutral win rate: {self.neutral_win_rate:.2%}")
         print(f"Positive recall: {self.positive_recall:.2%}, negative recall: {self.negative_recall:.2%}, neutral recall: {self.neutral_recall:.2%}")
         print(f"Draw win rate: {self.draw_win_rate:.2%}, draw return: {self.draw_return:.3f}, draw score: {self.draw_score:.3f}")
@@ -389,8 +389,6 @@ def get_print_trade_results(result_df, threshold, tp_label):
     
     first_date = trade_result_df.index.get_level_values('timestamp').min()
     last_date = trade_result_df.index.get_level_values('timestamp').max()
-    
-    # Print full period statistics
     trade_stats.print_stats(threshold, f"{first_date.strftime('%Y-%m-%d')} to {last_date.strftime('%Y-%m-%d')}")
     
     return trade_stats
