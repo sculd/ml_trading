@@ -6,7 +6,6 @@ import setup_env # needed for the environment variables
 import pandas as pd
 import numpy as np
 import market_data.util.time
-import ml_trading.machine_learning.util
 
 import market_data.util
 import market_data.util.time
@@ -55,7 +54,7 @@ combined_validation_df = ml_trading.research.backtest.run_with_feature_column_pr
     resample_params = market_data.machine_learning.resample.ResampleParams(price_col = 'close', threshold = 0.1),
     forward_period = forward_period,
     tp_label = tp_label,
-    target_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}',
+    target_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}_score',
     step_event_size = 400,
     validation_fixed_event_size = 400,
     test_fixed_event_size= 0,
@@ -63,13 +62,23 @@ combined_validation_df = ml_trading.research.backtest.run_with_feature_column_pr
     feature_column_prefixes=[]
 )
 
-trade_results_conservative = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.8)
-trade_results = ml_trading.research.backtest.get_print_trade_results(trade_results_conservative, threshold=0.8, tp_label=tp_label)
-print(trade_results)
+# Get the last date in the dataframe
+last_date = combined_validation_df.index.get_level_values('timestamp').max()
+# Calculate the date one month before
+one_month_ago = last_date - pd.Timedelta(days=30)
 
-trade_results_aggressive = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.5)
-trade_results = ml_trading.research.backtest.get_print_trade_results(trade_results_aggressive, threshold=0.5, tp_label=tp_label)
-print(trade_results)
+# Split the data into full period and last month
+last_month_df = combined_validation_df[combined_validation_df.index.get_level_values('timestamp') >= one_month_ago]
+
+print("\nFull period")
+trade_results = ml_trading.research.backtest.get_print_trade_results(combined_validation_df, threshold=0.8, tp_label=tp_label)
+print("\nLast month")
+trade_results = ml_trading.research.backtest.get_print_trade_results(last_month_df, threshold=0.8, tp_label=tp_label)
+
+print("\nFull period")
+trade_results = ml_trading.research.backtest.get_print_trade_results(combined_validation_df, threshold=0.5, tp_label=tp_label)
+print("\nLast month")
+trade_results = ml_trading.research.backtest.get_print_trade_results(last_month_df, threshold=0.5, tp_label=tp_label)
 #'''
 
 
@@ -82,12 +91,10 @@ combined_validation_df = run_with_feature_column_prefix()
 # , 'ffd_zscore'
 # 'obv_ffd_zscore', 'obv_pct_change_log', 'volume_ratio_log'
 
-trade_results_conservative = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.8)
-trade_results = get_print_trade_results(trade_results_conservative, threshold=0.8, tp_label=tp_label)
+trade_results = get_print_trade_results(combined_validation_df, threshold=0.8, tp_label=tp_label)
 print(trade_results)
 
-trade_results_aggressive = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.5)
-trade_results = get_print_trade_results(trade_results_aggressive, threshold=0.5, tp_label=tp_label)
+trade_results = get_print_trade_results(combined_validation_df, threshold=0.5, tp_label=tp_label)
 print(trade_results)
 #'''
 
@@ -125,13 +132,11 @@ trade_results_list = []
 for feature_column_prefix in feature_column_prefixes:
     combined_validation_df = validation_dfs[feature_column_prefix]
     print(f"\n{feature_column_prefix=}")
-    trade_results_conservative = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.8)
-    trade_results = get_print_trade_results(trade_results_conservative, threshold=0.8)
+    trade_results = get_print_trade_results(combined_validation_df, threshold=0.8)
     trade_results['feature_column_prefix'] = feature_column_prefix
     trade_results_list.append(trade_results)
 
-    trade_results_aggressive = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.5)
-    trade_results = get_print_trade_results(trade_results_aggressive, threshold=0.5)
+    trade_results = get_print_trade_results(combined_validation_df, threshold=0.5)
     trade_results['feature_column_prefix'] = feature_column_prefix
     trade_results_list.append(trade_results)
 
@@ -152,13 +157,11 @@ for prefix1, prefix2 in itertools.combinations(feature_column_prefixes, 2):
     label = ','.join(prefixes)
     combined_validation_df = validation_dfs[label]
     print(f"\n{label=}")
-    trade_results_conservative = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.8)
-    trade_results = get_print_trade_results(trade_results_conservative, threshold=0.8)
+    trade_results = get_print_trade_results(combined_validation_df, threshold=0.8)
     trade_results['feature_column_prefix'] = label
     trade_results_with_couple_features_list.append(trade_results)
 
-    trade_results_aggressive = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.5)
-    trade_results = get_print_trade_results(trade_results_aggressive, threshold=0.5)
+    trade_results = get_print_trade_results(combined_validation_df, threshold=0.5)
     trade_results['feature_column_prefix'] = label
     trade_results_with_couple_features_list.append(trade_results)
 

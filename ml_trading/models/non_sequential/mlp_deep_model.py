@@ -1,15 +1,17 @@
 import pandas as pd
 import numpy as np
 import os
+from typing import Tuple, Dict, List, Optional
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
-from typing import Tuple, Dict, List, Optional
-import ml_trading.machine_learning.util
-import ml_trading.models.util
 from tqdm.auto import tqdm
+
+import ml_trading.models.util
+import ml_trading.research.backtest
 
 _device = ml_trading.models.util.device
 
@@ -320,6 +322,7 @@ def train_mlp_model(
 def evaluate_mlp_model(
     mlp_model: MLPModel,
     validation_df: pd.DataFrame,
+    tp_label: str,
     target_column: str,
     forward_return_column: str,
     prediction_threshold: float = 0.5
@@ -359,5 +362,4 @@ def evaluate_mlp_model(
     validation_y_df['forward_return'] = forward_return_test
     validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
     
-    return ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df
-
+    return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df

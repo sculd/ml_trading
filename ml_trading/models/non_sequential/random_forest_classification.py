@@ -5,7 +5,6 @@ from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.ensemble import RandomForestClassifier
 import joblib
 from typing import List, Tuple, Dict, Any
-import ml_trading.machine_learning.util
 from ml_trading.models.util import into_X_y
 import ml_trading.models.model
 import os

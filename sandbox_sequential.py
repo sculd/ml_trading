@@ -6,7 +6,7 @@ import importlib
 import pandas as pd
 import numpy as np
 import market_data.util.time
-import ml_trading.machine_learning.util
+import ml_trading.research.backtest
 
 # OpenMP threading issue
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -160,7 +160,7 @@ def run_with_feature_column_prefix(feature_column_prefixes = None):
     for i, (train_timerange_str, validation_timerange_str, metrics) in enumerate(zip(train_timerange_strs, validaiton_timerange_strs, metrics_list)):
         print(f"{i+1}, train (size: {len(train_df)}): {train_timerange_str}\n" + f"validation (size: {len(validation_y_df)}): {validation_timerange_str}, non_zero_accuracy: {(metrics['non_zero_accuracy'] if 'non_zero_accuracy' in metrics else 0):.2f} (out of {(metrics['non_zero_predictions'] if 'non_zero_predictions' in metrics else 0):.2f})")
 
-    combined_validation_df = ml_trading.machine_learning.util.combine_validation_dfs(all_validation_dfs)
+    combined_validation_df = ml_trading.research.backtest.combine_validation_dfs(all_validation_dfs)
     return combined_validation_df
 
 
@@ -169,9 +169,9 @@ combined_validation_df = run_with_feature_column_prefix(['return_', 'rsi', 'open
 
 # Example usage:
 # Calculate with different thresholds for comparison
-trade_results_conservative = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.8)
-trade_results = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df)
-trade_results_aggressive = ml_trading.machine_learning.util.calculate_trade_returns(combined_validation_df, threshold=0.5)
+trade_results_conservative = ml_trading.research.backtest.add_trade_returns(combined_validation_df, threshold=0.8)
+trade_results = ml_trading.research.backtest.add_trade_returns(combined_validation_df)
+trade_results_aggressive = ml_trading.research.backtest.add_trade_returns(combined_validation_df, threshold=0.5)
 
 print('done')
 

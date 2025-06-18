@@ -6,7 +6,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from typing import List, Tuple, Dict, Optional, Union
 from ml_trading.models.sequential.util import into_X_y
-import ml_trading.machine_learning.util
 import logging
 
 logger = logging.getLogger(__name__)
@@ -340,6 +339,7 @@ def train_lstm_model(
 def evaluate_lstm_model(
     lstm_model: LSTMModel,
     validation_df: pd.DataFrame,
+    tp_label: str,
     target_column: str,
     forward_return_column: str,
     prediction_threshold: float = 0.5
@@ -384,5 +384,4 @@ def evaluate_lstm_model(
     validation_y_df['forward_return'] = forward_return_test
     validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
 
-    return ml_trading.machine_learning.util.get_metrics(y_test, y_pred_values, prediction_threshold), validation_y_df
-
+    return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df

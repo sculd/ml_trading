@@ -4,7 +4,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import xgboost as xgb
 from typing import List, Tuple, Dict, Any
-import ml_trading.machine_learning.util
 from ml_trading.models.util import into_X_y
 import ml_trading.models.model
 import os

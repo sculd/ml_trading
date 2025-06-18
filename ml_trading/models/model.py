@@ -4,8 +4,8 @@ from typing import List, Dict, Any, Tuple
 import os
 import json
 
-import ml_trading.machine_learning.util
 from ml_trading.models.util import into_X_y
+import ml_trading.research.backtest
 
 # Label mappings for dual binary classification models
 LABEL_MAP_POSITIVE = {-1: 0, 0: 0, 1: 1}  # +1 vs rest
@@ -67,9 +67,10 @@ class Model:
     def evaluate_model(
         self,
         validation_df: pd.DataFrame,
+        tp_label: str,
         target_column: str,
         forward_return_column: str,
-        prediction_threshold: float = 0.5
+        prediction_threshold: float
     ) -> Tuple[Dict[str, float], pd.DataFrame]:
         X_test, y_test, forward_return_test, _ = into_X_y(validation_df, target_column, forward_return_column, use_scaler=False)
         
@@ -92,7 +93,7 @@ class Model:
         validation_y_df['forward_return'] = forward_return_test.values
         validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
 
-        return ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df
+        return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
 
 
 class ClassificationModel(Model):
@@ -195,9 +196,10 @@ class ClassificationModel(Model):
     def evaluate_model(
         self,
         validation_df: pd.DataFrame,
+        tp_label: str,
         target_column: str,
         forward_return_column: str,
-        prediction_threshold: float = 0.5,
+        prediction_threshold: float,
         min_confidence_gap: float = 0.0
     ) -> Tuple[Dict[str, float], pd.DataFrame]:
         X_test, y_test, forward_return_test, _ = into_X_y(validation_df, target_column, forward_return_column, use_scaler=False)
@@ -215,7 +217,7 @@ class ClassificationModel(Model):
         print(f"Neutral returns (0): {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
         
         # Make predictions using custom threshold
-        y_pred = self.predict_with_thresholds(X_test.values, prediction_threshold, min_confidence_gap)
+        y_pred_decision = self.predict_with_thresholds(X_test.values, prediction_threshold, min_confidence_gap)
         
         # Also get default predictions for comparison
         y_pred_probs = self.predict(X_test.values)
@@ -230,7 +232,7 @@ class ClassificationModel(Model):
         validation_y_df['symbol'] = validation_df['symbol']
         validation_y_df['y'] = y_test.values
         validation_y_df['pred'] = y_pred_probs
-        validation_y_df['pred_label'] = y_pred
+        validation_y_df['pred_decision'] = y_pred_decision
         validation_y_df['pos_proba'] = pos_proba
         validation_y_df['neg_proba'] = neg_proba
         validation_y_df['forward_return'] = forward_return_test.values
@@ -243,16 +245,16 @@ class ClassificationModel(Model):
         
         # Print prediction distribution comparison
         print("\nPrediction distribution (with thresholds):")
-        pred_counts = pd.Series(y_pred).value_counts().sort_index()
+        pred_counts = pd.Series(y_pred_decision).value_counts().sort_index()
         for label, count in pred_counts.items():
-            print(f"Predicted {label}: {count} ({count/len(y_pred)*100:.2f}%)")
+            print(f"Predicted {label}: {count} ({count/len(y_pred_decision)*100:.2f}%)")
         
         # Calculate accuracy for both approaches
         from sklearn.metrics import accuracy_score
-        accuracy_custom = accuracy_score(y_test, y_pred)
+        accuracy_custom = accuracy_score(y_test, y_pred_decision)
         
         print(f"\nAccuracy comparison:")
         print(f"Custom thresholds: {accuracy_custom:.4f}")
 
-        return ml_trading.machine_learning.util.get_metrics(y_test, y_pred, prediction_threshold), validation_y_df
+        return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
 
