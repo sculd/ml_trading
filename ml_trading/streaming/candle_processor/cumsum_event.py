@@ -79,6 +79,7 @@ class CumsumEventSeries(base.Series):
         is_event = False
         self.s_pos = max(0, self.s_pos + diff)
         self.s_neg = min(0, self.s_neg + diff)
+        s_pos, s_neg = self.s_pos, self.s_neg
         if self.s_pos > self.resample_params.threshold:
             is_event = True
             self.s_pos = 0
@@ -88,6 +89,7 @@ class CumsumEventSeries(base.Series):
 
         purged = False
         if is_event:
+            logging.info(f"Event detected for {self.symbol} s_pos: {s_pos}, s_neg: {s_neg}, at {self.latest_timestamp_epoch_seconds}")
             lt = base.truncate_epoch_seconds_at_minute(self.latest_timestamp_epoch_seconds)
             dt_seconds = lt - self.latest_valid_event_timestamp_epoch_seconds_truncated_minutely
 
