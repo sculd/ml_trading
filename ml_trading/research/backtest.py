@@ -286,8 +286,9 @@ class TradeStats:
                 return default
             return numerator / denominator
 
-        win_rate = safe_divide(len(trade_result_df[trade_result_df['trade_return'] > 0]), total_trades)
-        loss_rate = safe_divide(len(trade_result_df[trade_result_df['trade_return'] < 0]), total_trades)
+        non_draw_mask = trades_mask & (trade_result_df['y'].abs() >= 1.0)
+        win_rate = safe_divide(len(trade_result_df[non_draw_mask & (trade_result_df['trade_return'] > 0)]), total_trades)
+        loss_rate = safe_divide(len(trade_result_df[non_draw_mask & (trade_result_df['trade_return'] < 0)]), total_trades)
 
         draw_mask = trades_mask & (trade_result_df['y'].abs() < 1.0)
         draw_result_df = trade_result_df[draw_mask]
@@ -368,8 +369,9 @@ class TradeStats:
         print(f"Total trades: {self.total_trades}")
         print(f"Average return per trade: {self.avg_return:.4f}")
         print(f"Trading win rate: {self.win_rate:.2%}, loss: {self.loss_rate:.2%}, draw: {self.draw_rate:.2%}")
-        print(f"Positive win rate: {self.positive_win_rate:.2%}, negative win rate: {self.negative_win_rate:.2%}, neutral win rate: {self.neutral_win_rate:.2%}")
-        print(f"Positive recall: {self.positive_recall:.2%}, negative recall: {self.negative_recall:.2%}, neutral recall: {self.neutral_recall:.2%}")
+        print(f"Positive win rate: {self.positive_win_rate:.2%}, recall: {self.positive_recall:.2%}")
+        print(f"Negative win rate: {self.negative_win_rate:.2%}, recall: {self.negative_recall:.2%}")
+        print(f"Neutral win rate: {self.neutral_win_rate:.2%}, recall: {self.neutral_recall:.2%}")
         print(f"Draw win rate: {self.draw_win_rate:.2%}, draw return: {self.draw_return:.3f}, draw score: {self.draw_score:.3f}")
         print(f"Total return: {self.total_return:.4f}")
         print(f"Total score: {self.total_score:.4f}")
