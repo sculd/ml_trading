@@ -69,10 +69,11 @@ class Model:
         validation_df: pd.DataFrame,
         tp_label: str,
         target_column: str,
+        tpsl_return_column: str,
         forward_return_column: str,
         prediction_threshold: float
     ) -> Tuple[Dict[str, float], pd.DataFrame]:
-        X_test, y_test, forward_return_test, _ = into_X_y(validation_df, target_column, forward_return_column, use_scaler=False)
+        X_test, y_test, tpsl_return_test, forward_return_test, _ = into_X_y(validation_df, target_column, tpsl_return_column, forward_return_column, use_scaler=False)
         
         # Print target label distribution in test set
         print("\nTest set target label distribution:")
@@ -90,6 +91,7 @@ class Model:
         validation_y_df['symbol'] = validation_df['symbol']
         validation_y_df['y'] = y_test.values
         validation_y_df['pred'] = y_pred
+        validation_y_df['tpsl_return'] = tpsl_return_test.values
         validation_y_df['forward_return'] = forward_return_test.values
         validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
 
@@ -198,11 +200,12 @@ class ClassificationModel(Model):
         validation_df: pd.DataFrame,
         tp_label: str,
         target_column: str,
+        tpsl_return_column: str,
         forward_return_column: str,
         prediction_threshold: float,
         min_confidence_gap: float = 0.0
     ) -> Tuple[Dict[str, float], pd.DataFrame]:
-        X_test, y_test, forward_return_test, _ = into_X_y(validation_df, target_column, forward_return_column, use_scaler=False)
+        X_test, y_test, tpsl_return_test, forward_return_test, _ = into_X_y(validation_df, target_column, tpsl_return_column, forward_return_column, use_scaler=False)
         
         # Print target label distribution in test set
         print("\nValidation set target label distribution:")
@@ -235,6 +238,7 @@ class ClassificationModel(Model):
         validation_y_df['pred_decision'] = y_pred_decision
         validation_y_df['pos_proba'] = pos_proba
         validation_y_df['neg_proba'] = neg_proba
+        validation_y_df['tpsl_return'] = tpsl_return_test.values
         validation_y_df['forward_return'] = forward_return_test.values
         validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
         

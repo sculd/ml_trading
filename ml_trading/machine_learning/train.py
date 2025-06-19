@@ -157,11 +157,6 @@ def train_model(training_params: TrainingParams):
 
     print(f'train: {len(train_df)}, {train_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {train_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')
 
-    # find pattern like 10m in the target column name
-    forward_time_horizon_str = re.search(r'\d+m', training_params.target_column).group(0)
-    forward_return_column = f"label_forward_return_{forward_time_horizon_str}"
-
-
     # Get the training function from registry
     train_func = get_train_function_by_label(training_params.model_class_id)
     if train_func is None:
@@ -169,8 +164,7 @@ def train_model(training_params: TrainingParams):
 
     model = train_func(
         train_df=train_df,
-        target_column=training_params.target_column,
-        forward_return_column=forward_return_column)
+        target_column=training_params.target_column)
     
     return model
 

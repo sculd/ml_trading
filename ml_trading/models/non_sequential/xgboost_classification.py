@@ -73,7 +73,6 @@ class XGBoostClassificationModel(ml_trading.models.model.ClassificationModel):
 def train_xgboost_model(
     train_df: pd.DataFrame,
     target_column: str,
-    forward_return_column: str,
     random_state: int = 42,
     xgb_params: Dict[str, Any] = None,
 ) -> XGBoostClassificationModel:
@@ -90,7 +89,7 @@ def train_xgboost_model(
     Returns:
         Trained XGBoostClassificationModel instance with two models
     """
-    X_train, y_train, forward_return_train, _ = into_X_y(train_df, target_column, forward_return_column, use_scaler=False)
+    X_train, y_train, _, _, _ = into_X_y(train_df, target_column, use_scaler=False)
     
     # Print target label distribution
     print("\nTraining set target label distribution:")

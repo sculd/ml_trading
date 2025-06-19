@@ -68,7 +68,8 @@ def run_with_feature_column_prefix(
     validaiton_timerange_strs = []
     all_validation_dfs = []
 
-    target_column=target_column or f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}'
+    target_column = target_column or f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}'
+    tpsl_return_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}_return'
     forward_return_column = f'label_forward_return_{forward_period}'
 
     for i, (train_df, validation_df, test_df) in enumerate(data_sets):
@@ -118,13 +119,13 @@ def run_with_feature_column_prefix(
         
         model = train_func(
             train_df=train_df,
-            target_column=target_column,
-            forward_return_column=forward_return_column)
+            target_column=target_column)
         
         trade_stats, validation_y_df = model.evaluate_model(
             validation_df=validation_df,
             tp_label=tp_label,
             target_column=target_column,
+            tpsl_return_column=tpsl_return_column,
             forward_return_column=forward_return_column,
             prediction_threshold=0.50
         )
@@ -197,7 +198,7 @@ def combine_validation_dfs(all_validation_dfs):
     return combined_validation_df
 
 
-def add_trade_returns(result_df, threshold=0.70):
+def _add_trade_returns(result_df, threshold=0.70):
     """
     Add pred_decision and trade_return columns to the input dataframe.
 
@@ -220,7 +221,7 @@ def add_trade_returns(result_df, threshold=0.70):
     result_df['trade_return'] = 0.0
     result_df['trade_return'] = np.where(
         result_df['pred_decision'] != 0, 
-        result_df['pred_decision'] * result_df['y'], 
+        result_df['pred_decision'] * result_df['tpsl_return'], 
         result_df['trade_return']
     )
     # For draw cases (y == 0), use forward_return; otherwise use y
@@ -238,6 +239,7 @@ class TradeStats:
     total_trades: int
     avg_return: float
     total_return: float
+    total_score: float
     win_rate: float
     loss_rate: float
     draw_rate: float
@@ -275,6 +277,7 @@ class TradeStats:
         total_trades = len(trading_decisions)
         avg_return = trading_decisions['trade_return'].mean()
         total_return = trading_decisions['trade_return'].sum()
+        total_score = total_return / (int(tp_label) / 1000.)
 
         def safe_divide(numerator, denominator, default=0.0):
             if denominator == 0:
@@ -291,7 +294,7 @@ class TradeStats:
         n_draw = len(draw_result_df)
         draw_rate = safe_divide(n_draw, total_trades)
         draw_return = draw_result_df['trade_return'].sum()
-        draw_score = draw_return / (int(tp_label) / 1000.)
+        draw_score = safe_divide(draw_return, (int(tp_label) / 1000.))
         n_draw_wins = len(draw_result_df[draw_result_df['trade_return'] > 0])
         draw_win_rate = safe_divide(n_draw_wins, n_draw)
         
@@ -337,6 +340,7 @@ class TradeStats:
             total_trades=total_trades,
             avg_return=avg_return,
             total_return=total_return,
+            total_score=total_score,
             win_rate=win_rate,
             loss_rate=loss_rate,
             draw_rate=draw_rate,
@@ -368,8 +372,7 @@ class TradeStats:
         print(f"Positive recall: {self.positive_recall:.2%}, negative recall: {self.negative_recall:.2%}, neutral recall: {self.neutral_recall:.2%}")
         print(f"Draw win rate: {self.draw_win_rate:.2%}, draw return: {self.draw_return:.3f}, draw score: {self.draw_score:.3f}")
         print(f"Total return: {self.total_return:.4f}")
-        print(f"Total return + draw score: {self.total_return + self.draw_score:.4f}")
-
+        print(f"Total score: {self.total_score:.4f}")
 
 
 def get_print_trade_results(result_df, threshold, tp_label):
@@ -377,12 +380,13 @@ def get_print_trade_results(result_df, threshold, tp_label):
     result_df is expected to have these columns:
     - y
     - pred
+    - tpsl_return
     - forward_return
 
     Note that the result does not have timestamp and symbol at all.
     '''
     # now pred_decision and trade_return are added
-    trade_result_df = add_trade_returns(result_df, threshold=threshold)
+    trade_result_df = _add_trade_returns(result_df, threshold=threshold)
 
     # Calculate stats for full period
     trade_stats = TradeStats.from_result_df(trade_result_df, tp_label)

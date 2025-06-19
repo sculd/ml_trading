@@ -58,7 +58,6 @@ class LightGBMModel(ml_trading.models.model.Model):
 def train_lightgbm_model(
     train_df: pd.DataFrame,
     target_column: str,
-    forward_return_column: str,
     random_state: int = 42,
     lgb_params: Dict[str, Any] = None,
 ) -> LightGBMModel:
@@ -77,7 +76,7 @@ def train_lightgbm_model(
     """
     # Drop the symbol column
 
-    X_train, y_train, forward_return_train, _ = into_X_y(train_df, target_column, forward_return_column, use_scaler=False)
+    X_train, y_train, _, _, _ = into_X_y(train_df, target_column, use_scaler=False)
     
     # Split into train and test sets
     '''
