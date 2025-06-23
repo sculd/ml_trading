@@ -15,7 +15,7 @@ from ml_trading.models.model import LABEL_MAP_POSITIVE, LABEL_MAP_NEGATIVE
 _model_label = "xgboost_classification"
 
 @register_model(_model_label)
-class XGBoostClassificationModel(ml_trading.models.model.ClassificationModel):
+class XGBoostClassificationModel(ml_trading.models.model.BinaryClassificationModel):
     def __init__(
         self, 
         model_name: str,

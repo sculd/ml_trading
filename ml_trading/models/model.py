@@ -12,6 +12,20 @@ LABEL_MAP_POSITIVE = {-1: 0, 0: 0, 1: 1}  # +1 vs rest
 LABEL_MAP_NEGATIVE = {-1: 1, 0: 0, 1: 0}  # -1 vs rest
 
 
+def print_target_label_distribution(y: np.ndarray):
+    # Print target label distribution in test set
+    print("\nTarget label distribution:")
+    total_samples = len(y)
+    up_samples = np.sum(y > 0)
+    down_samples = np.sum(y < 0)
+    neutral_samples = np.sum(y == 0)
+    
+    print(f"Total samples: {total_samples}")
+    print(f"Positive returns (+1): {up_samples} ({up_samples/total_samples*100:.2f}%)")
+    print(f"Negative returns (-1): {down_samples} ({down_samples/total_samples*100:.2f}%)")
+    print(f"Neutral returns (0): {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
+            
+
 class Model:
     def __init__(
             self, 
@@ -75,15 +89,9 @@ class Model:
     ) -> Tuple[Dict[str, float], pd.DataFrame]:
         X_test, y_test, tpsl_return_test, forward_return_test, _ = into_X_y(validation_df, target_column, tpsl_return_column, forward_return_column, use_scaler=False)
         
-        # Print target label distribution in test set
-        print("\nTest set target label distribution:")
-        total_samples = len(y_test)
-        up_samples = np.sum(y_test >= 1.)
-        down_samples = np.sum(y_test <= -1.0)
-        neutral_samples = np.sum((y_test < 1.) & (y_test > -1.0))
-        
-        print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
-        
+        print("\--------------")
+        print_target_label_distribution(y_test)
+
         # Make predictions
         y_pred = self.predict(X_test.values)
 
@@ -98,7 +106,7 @@ class Model:
         return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
 
 
-class ClassificationModel(Model):
+class BinaryClassificationModel(Model):
     def __init__(
         self, 
         model_name: str,
@@ -169,8 +177,8 @@ class ClassificationModel(Model):
         
         Args:
             X: Input features
-            threshold: Confidence threshold for both models (default 0.5)
-            min_confidence_gap: Minimum gap between positive and negative probabilities (default 0.0)
+            threshold: Confidence threshold for directional predictions (default 0.5)
+            min_confidence_gap: Minimum gap between winning class and runner-up (default 0.0)
             
         Returns:
             np.ndarray: Predictions as -1, 0, or +1
@@ -207,18 +215,9 @@ class ClassificationModel(Model):
     ) -> Tuple[Dict[str, float], pd.DataFrame]:
         X_test, y_test, tpsl_return_test, forward_return_test, _ = into_X_y(validation_df, target_column, tpsl_return_column, forward_return_column, use_scaler=False)
         
-        # Print target label distribution in test set
-        print("\nValidation set target label distribution:")
-        total_samples = len(y_test)
-        up_samples = np.sum(y_test > 0)
-        down_samples = np.sum(y_test < 0)
-        neutral_samples = np.sum(y_test == 0)
-        
-        print(f"Total samples: {total_samples}")
-        print(f"Positive returns (+1): {up_samples} ({up_samples/total_samples*100:.2f}%)")
-        print(f"Negative returns (-1): {down_samples} ({down_samples/total_samples*100:.2f}%)")
-        print(f"Neutral returns (0): {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
-        
+        print("\--------------")
+        print_target_label_distribution(y_test)
+
         # Make predictions using custom threshold
         y_pred_decision = self.predict_with_thresholds(X_test.values, prediction_threshold, min_confidence_gap)
         
@@ -261,4 +260,3 @@ class ClassificationModel(Model):
         print(f"Custom thresholds: {accuracy_custom:.4f}")
 
         return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
-

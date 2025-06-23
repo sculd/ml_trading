@@ -16,7 +16,7 @@ from ml_trading.models.model import LABEL_MAP_POSITIVE, LABEL_MAP_NEGATIVE
 _model_label = "random_forest_classification"
 
 @register_model(_model_label)
-class RandomForestClassificationModel(ml_trading.models.model.ClassificationModel):
+class RandomForestClassificationModel(ml_trading.models.model.BinaryClassificationModel):
     def __init__(
         self, 
         model_name: str,
