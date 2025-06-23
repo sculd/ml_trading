@@ -14,6 +14,8 @@ import ml_trading.models.registry
 from ml_trading.machine_learning.validation_data import PurgeParams
 
 from market_data.ingest.bq.common import DATASET_MODE, EXPORT_MODE, AGGREGATION_MODE
+_max_active_positions = 5
+
 
 def run_with_feature_column_prefix(
         dataset_mode: DATASET_MODE,
@@ -198,35 +200,75 @@ def combine_validation_dfs(all_validation_dfs):
     return combined_validation_df
 
 
-def _add_trade_returns(result_df, threshold=0.70):
+def _get_trade_returns(result_df, threshold=0.70, max_active_positions=_max_active_positions):
     """
-    Add pred_decision and trade_return columns to the input dataframe.
+    Add pred_decision and trade_return columns with position limits.
+    Optimized: work only on trading signals subset for speed.
 
     result_df is expected to have these columns:
     - y
     - pred
+    - tpsl_return
     - forward_return
     
     Args:
         threshold: Threshold for determining trade decisions
+        max_active_positions: Maximum positions per 5-minute window
     """
-    # Create a copy to avoid SettingWithCopyWarning
-    result_df = result_df.copy()
+    result_df = result_df.copy().sort_index(level='timestamp')
     
-    # Convert predictions to discrete values using threshold
-    result_df['pred_decision'] = 0.0
-    result_df.loc[result_df['pred'] > threshold, 'pred_decision'] = 1
-    result_df.loc[result_df['pred'] < -threshold, 'pred_decision'] = -1
+    # Step 1: Create raw signals on full dataframe
+    result_df['pred_decision_raw'] = 0.0
+    result_df.loc[result_df['pred'] > threshold, 'pred_decision_raw'] = 1
+    result_df.loc[result_df['pred'] < -threshold, 'pred_decision_raw'] = -1
+    
+    # Step 2: Extract only non-zero signals for processing (MUCH smaller subset)
+    signals_mask = result_df['pred_decision_raw'] != 0
+    signals_df = result_df[signals_mask].copy()
+    
+    if len(signals_df) == 0:
+        # No signals to process
+        result_df['pred_decision'] = 0.0
+        active_trades_mask = result_df['pred_decision'] != 0
+    else:
+        # Step 3: Add 5-minute timestamp grouping only to signals
+        signals_df = signals_df.reset_index()
+        signals_df['timestamp_5min'] = signals_df['timestamp'].dt.floor('5min')
+        
+        # Step 4: Apply position limits only to signals subset
+        def limit_positions_per_5min_window(group):
+            if len(group) <= max_active_positions:
+                # All signals can be taken
+                group['pred_decision'] = group['pred_decision_raw']
+            else:
+                # Randomly select N signals from this group
+                selected_indices = group.sample(n=max_active_positions, random_state=None).index
+                group['pred_decision'] = 0
+                group.loc[selected_indices, 'pred_decision'] = group.loc[selected_indices, 'pred_decision_raw']
+            
+            return group
+        
+        # Apply limits only to signals (much faster on smaller dataset)
+        signals_df = signals_df.groupby('timestamp_5min', group_keys=False).apply(limit_positions_per_5min_window)
+        
+        # Step 5: Create mapping of final decisions back to original dataframe
+        signals_df = signals_df.set_index(['timestamp', 'symbol'])
+        
+        # Step 6: Apply results back to original dataframe
+        result_df['pred_decision'] = 0.0  # Initialize all to 0
+        result_df.loc[signals_df.index, 'pred_decision'] = signals_df['pred_decision']
+        
+        active_trades_mask = result_df['pred_decision'] != 0
 
     result_df['trade_return'] = 0.0
     result_df['trade_return'] = np.where(
-        result_df['pred_decision'] != 0, 
+        active_trades_mask, 
         result_df['pred_decision'] * result_df['tpsl_return'], 
         result_df['trade_return']
     )
     # For draw cases (y == 0), use forward_return; otherwise use y
     result_df['trade_return'] = np.where(
-        (result_df['pred_decision'] != 0) & (result_df['y'].abs() < 1.0), 
+        active_trades_mask & (result_df['y'].abs() < 1.0), 
         result_df['pred_decision'] * result_df['forward_return'], 
         result_df['trade_return']
     )
@@ -258,7 +300,7 @@ class TradeStats:
     r2_trades: float
     
     @staticmethod
-    def from_result_df(trade_result_df, tp_label):
+    def from_result_df(result_df, threshold, tp_label):
         '''
         Create TradeStats from trade result dataframe.
         
@@ -271,13 +313,8 @@ class TradeStats:
 
         tp_label is like "30", "50" (3% and 5%)
         '''
-        # Calculate some statistics
-        trades_mask = trade_result_df['pred_decision'] != 0
-        trading_decisions = trade_result_df[trades_mask]
-        total_trades = len(trading_decisions)
-        avg_return = trading_decisions['trade_return'].mean()
-        total_return = trading_decisions['trade_return'].sum()
-        total_score = total_return / (int(tp_label) / 1000.)
+        # now pred_decision and trade_return are added
+        trade_result_df = _get_trade_returns(result_df, threshold=threshold)
 
         def safe_divide(numerator, denominator, default=0.0):
             if denominator == 0:
@@ -286,12 +323,36 @@ class TradeStats:
                 return default
             return numerator / denominator
 
-        non_draw_mask = trades_mask & (trade_result_df['y'].abs() >= 1.0)
-        win_rate = safe_divide(len(trade_result_df[non_draw_mask & (trade_result_df['trade_return'] > 0)]), total_trades)
-        loss_rate = safe_divide(len(trade_result_df[non_draw_mask & (trade_result_df['trade_return'] < 0)]), total_trades)
+        # Calculate some statistics
+        active_trades_mask = trade_result_df['pred_decision'] != 0
+        long_trade_mask = trade_result_df['pred_decision'] > 0
+        short_trade_mask = trade_result_df['pred_decision'] < 0
+        neutral_trade_mask = trade_result_df['pred_decision'] == 0
 
-        draw_mask = trades_mask & (trade_result_df['y'].abs() < 1.0)
-        draw_result_df = trade_result_df[draw_mask]
+        positive_actual_mask = trade_result_df['y'] >= 1.0
+        negative_actual_mask = trade_result_df['y'] <= -1.0
+        non_neutral_actual_mask = trade_result_df['y'].abs() >= 1.0
+        neutral_actual_mask = trade_result_df['y'].abs() < 1.0
+
+        win_long_trade_mask = long_trade_mask & positive_actual_mask
+        win_short_trade_mask = short_trade_mask & negative_actual_mask
+        win_trade_mask = win_long_trade_mask | win_short_trade_mask
+        win_neutral_mask = neutral_trade_mask & neutral_actual_mask
+        loss_long_trade_mask = long_trade_mask & negative_actual_mask   
+        loss_short_trade_mask = short_trade_mask & positive_actual_mask
+        loss_trade_mask = loss_long_trade_mask | loss_short_trade_mask
+        draw_trade_mask = active_trades_mask & neutral_actual_mask
+
+        active_trade_result_df = trade_result_df[active_trades_mask]
+        total_trades = len(active_trade_result_df)
+        avg_return = active_trade_result_df['trade_return'].mean()
+        total_return = active_trade_result_df['trade_return'].sum()
+        total_score = total_return / (int(tp_label) / 1000.)
+
+        win_rate = safe_divide(len(trade_result_df[win_trade_mask]), total_trades)
+        loss_rate = safe_divide(len(trade_result_df[loss_trade_mask]), total_trades)
+
+        draw_result_df = trade_result_df[draw_trade_mask]
         n_draw = len(draw_result_df)
         draw_rate = safe_divide(n_draw, total_trades)
         draw_return = draw_result_df['trade_return'].sum()
@@ -299,32 +360,27 @@ class TradeStats:
         n_draw_wins = len(draw_result_df[draw_result_df['trade_return'] > 0])
         draw_win_rate = safe_divide(n_draw_wins, n_draw)
         
-        # Calculate positive, negative, and neutral trade performance
-        positive_trades = trade_result_df[trade_result_df['pred_decision'] > 0]
-        negative_trades = trade_result_df[trade_result_df['pred_decision'] < 0]
-        neutral_trades = trade_result_df[trade_result_df['pred_decision'] == 0]
+        long_trades = trade_result_df[long_trade_mask]
+        short_trades = trade_result_df[short_trade_mask]
+        neutral_trades = trade_result_df[neutral_trade_mask]
         
-        positive_wins = len(positive_trades[positive_trades['trade_return'] > 0])
-        negative_wins = len(negative_trades[negative_trades['trade_return'] > 0])
-        # For neutral trades, a "win" is when the actual outcome was also neutral (y == 0)
-        neutral_wins = len(neutral_trades[neutral_trades['y'].abs() < 1.0])
-        
-        positive_win_rate = safe_divide(positive_wins, len(positive_trades))
-        negative_win_rate = safe_divide(negative_wins, len(negative_trades))
-        neutral_win_rate = safe_divide(neutral_wins, len(neutral_trades))
+        long_wins = trade_result_df[win_long_trade_mask]
+        short_wins = trade_result_df[win_short_trade_mask]
+        neutral_wins = trade_result_df[win_neutral_mask]
         
         # Calculate recall metrics (prediction accuracy for actual outcomes)
-        actual_positive = trade_result_df[trade_result_df['y'] >= 1.0]
-        actual_negative = trade_result_df[trade_result_df['y'] <= -1.0]
-        actual_neutral = trade_result_df[trade_result_df['y'].abs() < 1.0]
-        
-        predicted_positive_correctly = len(actual_positive[actual_positive['pred_decision'] > 0])
-        predicted_negative_correctly = len(actual_negative[actual_negative['pred_decision'] < 0])
-        predicted_neutral_correctly = len(actual_neutral[actual_neutral['pred_decision'] == 0])
-        
-        positive_recall = safe_divide(predicted_positive_correctly, len(actual_positive))
-        negative_recall = safe_divide(predicted_negative_correctly, len(actual_negative))
-        neutral_recall = safe_divide(predicted_neutral_correctly, len(actual_neutral))
+        actual_positive = trade_result_df[positive_actual_mask]
+        actual_negative = trade_result_df[negative_actual_mask]
+        actual_neutral = trade_result_df[neutral_actual_mask]
+
+        positive_win_rate = safe_divide(len(long_wins), len(long_trades))
+        negative_win_rate = safe_divide(len(short_wins), len(short_trades))
+        neutral_win_rate = safe_divide(len(neutral_wins), len(neutral_trades))
+
+        # For neutral trades, a "win" is when the actual outcome was also neutral (y == 0)
+        positive_recall = safe_divide(len(long_wins), len(actual_positive))
+        negative_recall = safe_divide(len(short_wins), len(actual_negative))
+        neutral_recall = safe_divide(len(neutral_wins), len(actual_neutral))
         
         # Calculate MAE, MSE, and R²
         mae = np.mean(np.abs(trade_result_df['y'] - trade_result_df['pred']))
@@ -332,8 +388,8 @@ class TradeStats:
         r2 = r2_score(trade_result_df['y'], trade_result_df['pred'])
         
         # Calculate R² for trading decisions only (non-neutral predictions)
-        if len(trading_decisions) > 1:  # Need at least 2 points for R²
-            r2_trades = r2_score(trading_decisions['y'], trading_decisions['pred'])
+        if len(active_trade_result_df) > 1:  # Need at least 2 points for R²
+            r2_trades = r2_score(active_trade_result_df['y'], active_trade_result_df['pred'])
         else:
             r2_trades = 0.0  # Default if not enough trading decisions
         
@@ -360,21 +416,26 @@ class TradeStats:
             r2_trades=r2_trades,
         )
     
+    def __str__(self):
+        result = ""
+        result += f"MAE: {self.mae:.4f}, MSE: {self.mse:.4f}, R²(all): {self.r2:.4f}, R²(trades): {self.r2_trades:.4f}"
+        result += f"\nTotal trades: {self.total_trades}"
+        result += f"\nAverage return per trade: {self.avg_return:.4f}"
+        result += f"\nTrading win rate: {self.win_rate:.2%}, loss: {self.loss_rate:.2%}, draw: {self.draw_rate:.2%}"
+        result += f"\nPositive win rate: {self.positive_win_rate:.2%}, recall: {self.positive_recall:.2%}"
+        result += f"\nNegative win rate: {self.negative_win_rate:.2%}, recall: {self.negative_recall:.2%}"
+        result += f"\nNeutral win rate: {self.neutral_win_rate:.2%}, recall: {self.neutral_recall:.2%}"
+        result += f"\nDraw win rate: {self.draw_win_rate:.2%}, draw return: {self.draw_return:.3f}, draw score: {self.draw_score:.3f}"
+        result += f"\nTotal return: {self.total_return:.4f}"
+        result += f"\nTotal score: {self.total_score:.4f}"
+        return result
+    
     def print_stats(self, threshold: float, date_range: str = ""):
         """Print formatted trading statistics"""
         print(f"\nTrade statistics (threshold={threshold}):")
         if date_range:
             print(f"Period: {date_range}")
-        print(f"MAE: {self.mae:.4f}, MSE: {self.mse:.4f}, R²(all): {self.r2:.4f}, R²(trades): {self.r2_trades:.4f}")
-        print(f"Total trades: {self.total_trades}")
-        print(f"Average return per trade: {self.avg_return:.4f}")
-        print(f"Trading win rate: {self.win_rate:.2%}, loss: {self.loss_rate:.2%}, draw: {self.draw_rate:.2%}")
-        print(f"Positive win rate: {self.positive_win_rate:.2%}, recall: {self.positive_recall:.2%}")
-        print(f"Negative win rate: {self.negative_win_rate:.2%}, recall: {self.negative_recall:.2%}")
-        print(f"Neutral win rate: {self.neutral_win_rate:.2%}, recall: {self.neutral_recall:.2%}")
-        print(f"Draw win rate: {self.draw_win_rate:.2%}, draw return: {self.draw_return:.3f}, draw score: {self.draw_score:.3f}")
-        print(f"Total return: {self.total_return:.4f}")
-        print(f"Total score: {self.total_score:.4f}")
+        print(self)
 
 
 def get_print_trade_results(result_df, threshold, tp_label):
@@ -387,14 +448,11 @@ def get_print_trade_results(result_df, threshold, tp_label):
 
     Note that the result does not have timestamp and symbol at all.
     '''
-    # now pred_decision and trade_return are added
-    trade_result_df = _add_trade_returns(result_df, threshold=threshold)
-
     # Calculate stats for full period
-    trade_stats = TradeStats.from_result_df(trade_result_df, tp_label)
+    trade_stats = TradeStats.from_result_df(result_df, threshold, tp_label)
     
-    first_date = trade_result_df.index.get_level_values('timestamp').min()
-    last_date = trade_result_df.index.get_level_values('timestamp').max()
+    first_date = result_df.index.get_level_values('timestamp').min()
+    last_date = result_df.index.get_level_values('timestamp').max()
     trade_stats.print_stats(threshold, f"{first_date.strftime('%Y-%m-%d')} to {last_date.strftime('%Y-%m-%d')}")
     
     return trade_stats
