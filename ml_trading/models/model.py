@@ -260,3 +260,167 @@ class BinaryClassificationModel(Model):
         print(f"Custom thresholds: {accuracy_custom:.4f}")
 
         return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
+
+
+class MultiClassClassificationModel(Model):
+    def __init__(
+        self, 
+        model_name: str,
+        columns: List[str],
+        target: str,
+        multiclass_model: Any,
+        ):
+        super().__init__(model_name, columns, target)
+        self.multiclass_model = multiclass_model  # Single model for 3-class classification (-1, 0, 1)
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict using multiclass model and return continuous scores.
+        
+        Returns a continuous score where:
+        - Positive values indicate bullish prediction (closer to +1)
+        - Negative values indicate bearish prediction (closer to -1)  
+        - Values near 0 indicate neutral prediction
+        """
+        # Get class probabilities from multiclass model
+        probas = self.multiclass_model.predict_proba(X)
+        
+        # probas shape: (n_samples, 3) for classes [-1, 0, 1]
+        # Convert to continuous score: P(+1) - P(-1)
+        # This gives a score in range [-1, 1]
+        prob_negative = probas[:, 0]  # P(y = -1)
+        prob_neutral = probas[:, 1]   # P(y = 0)  
+        prob_positive = probas[:, 2]  # P(y = 1)
+        
+        # Create continuous score: positive when bullish, negative when bearish
+        continuous_score = prob_positive - prob_negative
+        
+        return continuous_score
+    
+    def predict_proba(self, X: np.ndarray) -> Dict[str, np.ndarray]:
+        """
+        Get prediction probabilities from multiclass model.
+        
+        Returns:
+            Dict with 'positive', 'negative', and 'neutral' probability arrays
+        """
+        probas = self.multiclass_model.predict_proba(X)
+        
+        # probas shape: (n_samples, 3) for mapped classes [0, 1, 2]
+        # 0 -> bearish (-1), 1 -> neutral (0), 2 -> bullish (+1)
+        prob_negative = probas[:, 0]  # P(mapped_y = 0) = P(y = -1)
+        prob_neutral = probas[:, 1]   # P(mapped_y = 1) = P(y = 0)
+        prob_positive = probas[:, 2]  # P(mapped_y = 2) = P(y = 1)
+        
+        return {
+            'negative': prob_negative,
+            'neutral': prob_neutral,
+            'positive': prob_positive
+        }
+    
+    def predict_with_thresholds(self, X: np.ndarray, threshold: float = 0.5, 
+                               min_confidence_gap: float = 0.0) -> np.ndarray:
+        """
+        Predict using custom probability threshold for multiclass model.
+        
+        Args:
+            X: Input features
+            threshold: Confidence threshold for directional predictions (default 0.5)
+            min_confidence_gap: Minimum gap between winning class and runner-up (default 0.0)
+            
+        Returns:
+            np.ndarray: Predictions as -1, 0, or +1
+        """
+        probas = self.predict_proba(X)
+        prob_negative = probas['negative']
+        prob_neutral = probas['neutral']
+        prob_positive = probas['positive']
+        
+        predictions = np.zeros(len(prob_positive), dtype=int)
+        
+        # Find the class with highest probability for each sample
+        max_prob_indices = np.argmax([prob_negative, prob_neutral, prob_positive], axis=0)
+        max_probs = np.array([prob_negative, prob_neutral, prob_positive]).max(axis=0)
+        
+        # Calculate confidence gap (difference between max and second-max probability)
+        sorted_probs = np.sort([prob_negative, prob_neutral, prob_positive], axis=0)
+        confidence_gaps = sorted_probs[2] - sorted_probs[1]  # max - second_max
+        
+        # Apply thresholds
+        confident_enough = max_probs >= threshold
+        gap_sufficient = confidence_gaps >= min_confidence_gap
+        
+        # Make predictions only when both conditions are met
+        valid_predictions = confident_enough & gap_sufficient
+        
+        # Map probability indices to actual labels: [0, 1, 2] -> [-1, 0, 1]
+        # prob_negative (index 0) -> -1, prob_neutral (index 1) -> 0, prob_positive (index 2) -> 1
+        class_mapping = np.array([-1, 0, 1])
+        predictions[valid_predictions] = class_mapping[max_prob_indices[valid_predictions]]
+        
+        return predictions
+        
+    def evaluate_model(
+        self,
+        validation_df: pd.DataFrame,
+        tp_label: str,
+        target_column: str,
+        tpsl_return_column: str,
+        forward_return_column: str,
+        prediction_threshold: float,
+        min_confidence_gap: float = 0.0
+    ) -> Tuple[Dict[str, float], pd.DataFrame]:
+        X_test, y_test, tpsl_return_test, forward_return_test, _ = into_X_y(validation_df, target_column, tpsl_return_column, forward_return_column, use_scaler=False)
+        
+        y_test[y_test >= 1] = 1
+        y_test[y_test <= -1] = -1
+        y_test[(y_test < 1) | y_test > -1] = 0
+
+        print("\--------------")
+        print_target_label_distribution(y_test)
+
+        # Make predictions using custom threshold
+        y_pred_decision = self.predict_with_thresholds(X_test.values, prediction_threshold, min_confidence_gap)
+        
+        # Also get default predictions for comparison
+        y_pred_probs = self.predict(X_test.values)
+        
+        # Get prediction probabilities for DataFrame
+        probabilities = self.predict_proba(X_test.values)
+        prob_negative = probabilities['negative']
+        prob_neutral = probabilities['neutral']
+        prob_positive = probabilities['positive']
+        
+        # Create validation DataFrame
+        validation_y_df = pd.DataFrame(index=validation_df.index)
+        validation_y_df['symbol'] = validation_df['symbol']
+        validation_y_df['y'] = y_test.values
+        validation_y_df['pred'] = y_pred_probs
+        validation_y_df['pred_decision'] = y_pred_decision
+        validation_y_df['prob_negative'] = prob_negative
+        validation_y_df['prob_neutral'] = prob_neutral
+        validation_y_df['prob_positive'] = prob_positive
+        validation_y_df['tpsl_return'] = tpsl_return_test.values
+        validation_y_df['forward_return'] = forward_return_test.values
+        validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
+        
+        # Print threshold settings
+        print(f"\nThreshold Settings:")
+        print(f"Confidence threshold: {prediction_threshold}")
+        print(f"Min confidence gap: {min_confidence_gap}")
+        
+        # Print prediction distribution comparison
+        print("\nPrediction distribution (with thresholds):")
+        pred_counts = pd.Series(y_pred_decision).value_counts().sort_index()
+        for label, count in pred_counts.items():
+            print(f"Predicted {label}: {count} ({count/len(y_pred_decision)*100:.2f}%)")
+        
+        # Calculate accuracy for both approaches
+        from sklearn.metrics import accuracy_score
+        accuracy_custom = accuracy_score(y_test, y_pred_decision)
+        
+        print(f"\nAccuracy comparison:")
+        print(f"Custom thresholds: {accuracy_custom:.4f}")
+
+        return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
+
