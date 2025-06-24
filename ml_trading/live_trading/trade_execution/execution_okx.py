@@ -2,6 +2,7 @@ import logging, os, requests
 from collections import defaultdict
 from dataclasses import dataclass
 import ml_trading.live_trading.publish.telegram
+from ml_trading.live_trading.trade_execution.throttle import Throttle, ThrottleConfig
 import hmac
 import hashlib
 import base64
@@ -149,6 +150,7 @@ class OkxTradeExecutionParams:
     target_betsize: float
     leverage: float
     is_dry_run: bool = False
+    throttle_config: ThrottleConfig = None
 
 
 class TradeExecution:
@@ -156,9 +158,14 @@ class TradeExecution:
         self.target_betsize = param.target_betsize
         self.leverage = param.leverage
         self.direction_per_symbol = defaultdict(int)
+        self.is_dry_run = param.is_dry_run
+        
+        # Initialize throttling
+        throttle_config = param.throttle_config or ThrottleConfig()
+        self.throttle = Throttle(throttle_config)
+        
         self.init_inst_data()
         self.close_open_positions()
-        self.is_dry_run = param.is_dry_run
 
     def enable_dry_run(self, enable=True):
         self.is_dry_run = enable
@@ -215,6 +222,13 @@ class TradeExecution:
 
         side: +1 for long, -1 for short
         '''
+        # Check rate limits first
+        if not self.throttle.can_execute(epoch_seconds, symbol):
+            message = f'[RATE LIMITED] at {epoch_seconds}, for {symbol}, side: {side} - execution rejected due to rate limits'
+            logging.warning(message)
+            ml_trading.live_trading.publish.telegram.post_message(message)
+            return
+        
         price = get_current_price(symbol)
 
         message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, side: {side}'
@@ -238,6 +252,8 @@ class TradeExecution:
 
         if self.is_dry_run:
             logging.info("in dryrun mode, not actually make the order requests.")
+            # Record execution even in dry run for rate limiting
+            self.throttle.record_execution(epoch_seconds, symbol, success=True)
         else:
             result = trade_api.place_order(
                 instId=symbol, tdMode="isolated",
@@ -251,8 +267,13 @@ class TradeExecution:
 
             if result["code"] == "0":
                 logging.info(f'Successful order request, order_id: {result["data"][0]["ordId"]}')
+                # Record execution only on successful order
+                self.throttle.record_execution(epoch_seconds, symbol, success=True)
             else:
                 logging.error(f'Unsuccessful order request, error_code = {result["data"][0]["sCode"]}, Error_message = {result["data"][0]["sMsg"]}')
+                # Don't record execution on failure, and return early
+                self.throttle.record_execution(epoch_seconds, symbol, success=False)
+                return
 
         self.direction_per_symbol[symbol] = 1
 
@@ -263,6 +284,13 @@ class TradeExecution:
         tp_sl_return_size: ex. 0.05 means 5% take profit and stop loss.
         side: +1 for long, -1 for short
         '''
+        # Check rate limits first
+        if not self.throttle.can_execute(epoch_seconds, symbol):
+            message = f'[RATE LIMITED TP/SL] at {epoch_seconds}, for {symbol}, side: {side} - execution rejected due to rate limits'
+            logging.warning(message)
+            ml_trading.live_trading.publish.telegram.post_message(message)
+            return
+        
         price = get_current_price(symbol)
 
         message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, side: {side}'
@@ -303,6 +331,8 @@ class TradeExecution:
 
         if self.is_dry_run:
             logging.info("in dryrun mode, not actually make the order requests.")
+            # Record execution even in dry run for rate limiting
+            self.throttle.record_execution(epoch_seconds, symbol, success=True)
         else:
             try:
                 result = place_order_with_tp_sl_direct_api(
@@ -317,10 +347,18 @@ class TradeExecution:
                 
                 if result["code"] == "0":
                     logging.info(f'Successful order with TP/SL, order_id: {result["data"][0]["ordId"]}')
+                    # Record execution only on successful order
+                    self.throttle.record_execution(epoch_seconds, symbol, success=True)
                 else:
                     logging.error(f'Direct API order failed: {result}')
+                    # Don't record execution on failure, and return early
+                    self.throttle.record_execution(epoch_seconds, symbol, success=False)
+                    return
             except Exception as e:
                 logging.error(f'Direct API call failed: {e}')
+                # Don't record execution on API exception, and return early
+                self.throttle.record_execution(epoch_seconds, symbol, success=False)
+                return
 
         self.direction_per_symbol[symbol] = 1
 
