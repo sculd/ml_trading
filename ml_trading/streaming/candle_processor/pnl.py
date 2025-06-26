@@ -99,6 +99,38 @@ class PNLMixin:
         
         position = self.active_positions[symbol]
         
+        # Calculate current unrealized PnL based on candle close price
+        if position.side == "long":
+            current_pnl_return = (prev_minute_candle.close - position.entry_price) / position.entry_price
+        else:  # short
+            current_pnl_return = (position.entry_price - prev_minute_candle.close) / position.entry_price
+        
+        # Calculate position duration
+        position_duration_seconds = timestamp_epoch_seconds - position.entry_epoch_seconds
+        duration_minutes = position_duration_seconds / 60
+        
+        # Calculate target prices
+        if position.side == "long":
+            tp_target_price = position.entry_price * (1 + self.target_params.tp_value)
+            sl_target_price = position.entry_price * (1 - self.target_params.sl_value)
+            distance_to_tp = (tp_target_price - prev_minute_candle.close) / prev_minute_candle.close * 100
+            distance_to_sl = (prev_minute_candle.close - sl_target_price) / prev_minute_candle.close * 100
+        else:  # short
+            tp_target_price = position.entry_price * (1 - self.target_params.tp_value)
+            sl_target_price = position.entry_price * (1 + self.target_params.sl_value)
+            distance_to_tp = (prev_minute_candle.close - tp_target_price) / prev_minute_candle.close * 100
+            distance_to_sl = (sl_target_price - prev_minute_candle.close) / prev_minute_candle.close * 100
+        
+        # Log detailed position status every minute
+        logger.info(f"[PnL Monitor] {symbol} {position.side.upper()} | "
+                   f"Duration: {duration_minutes:.1f}min | "
+                   f"Entry: {position.entry_price:.6f} | "
+                   f"Current: {prev_minute_candle.close:.6f} | "
+                   f"PnL: {current_pnl_return*100:.2f}% | "
+                   f"TP: {tp_target_price:.6f} ({distance_to_tp:+.2f}%) | "
+                   f"SL: {sl_target_price:.6f} ({distance_to_sl:+.2f}%) | "
+                   f"OHLC: O{prev_minute_candle.open:.6f} H{prev_minute_candle.high:.6f} L{prev_minute_candle.low:.6f} C{prev_minute_candle.close:.6f}")
+        
         # For long positions:
         # - Use high price for take profit (most favorable case)
         # - Use low price for stop loss (worst case)
@@ -108,7 +140,6 @@ class PNLMixin:
         
         if position.side == "long":
             # Check take profit using high price (best case for longs)
-            tp_target_price = position.entry_price * (1 + self.target_params.tp_value)
             if prev_minute_candle.high >= tp_target_price:
                 # If TP hit, use the TP price for exit
                 exit_price = tp_target_price
@@ -118,7 +149,6 @@ class PNLMixin:
                 return {"position_changed": True, "reason": "tp", "pnl_return": position.pnl_return}
             
             # Check stop loss using low price (worst case for longs)
-            sl_target_price = position.entry_price * (1 - self.target_params.sl_value)
             if prev_minute_candle.low <= sl_target_price:
                 # If SL hit, use the SL price for exit
                 exit_price = sl_target_price
@@ -129,7 +159,6 @@ class PNLMixin:
                 
         else:  # short
             # Check take profit using low price (best case for shorts)
-            tp_target_price = position.entry_price * (1 - self.target_params.tp_value)
             if prev_minute_candle.low <= tp_target_price:
                 # If TP hit, use the TP price for exit
                 exit_price = tp_target_price
@@ -139,7 +168,6 @@ class PNLMixin:
                 return {"position_changed": True, "reason": "tp", "pnl_return": position.pnl_return}
             
             # Check stop loss using high price (worst case for shorts)
-            sl_target_price = position.entry_price * (1 + self.target_params.sl_value)
             if prev_minute_candle.high >= sl_target_price:
                 # If SL hit, use the SL price for exit
                 exit_price = sl_target_price
@@ -149,11 +177,9 @@ class PNLMixin:
                 return {"position_changed": True, "reason": "sl", "pnl_return": position.pnl_return}
             
         # Check timeout
-        position_duration_seconds = timestamp_epoch_seconds - position.entry_epoch_seconds
         timeout_seconds = self.target_params.forward_period * 60
         if position_duration_seconds >= timeout_seconds:
             # For timeout, use the current close price
-            duration_minutes = position_duration_seconds / 60
             timeout_minutes = timeout_seconds / 60
             logger.info(f"Position timeout triggered for {symbol}: duration {duration_minutes:.1f} minutes >= timeout {timeout_minutes:.1f} minutes (entry: {position.entry_price:.6f}, exit: {prev_minute_candle.close:.6f})")
             position = self.exit(symbol, timestamp_epoch_seconds, prev_minute_candle.close, "timeout")
