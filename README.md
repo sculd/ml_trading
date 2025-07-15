@@ -46,3 +46,22 @@ API keys should be provided as environment variables:
 - `OKX_API_KEY`
 - `OKX_SECRET_KEY`
 - `OKX_PASSPHRASE`
+
+### Automated Daily Updates (macOS)
+
+Set up automated daily market data updates using launchd:
+
+** Load the launchd job:**
+```bash
+# Load from project directory (recommended)
+launchctl load ~/projects/ml_trading/com.ml_trading.train_model.plist
+
+# Check if loaded
+launchctl list | grep ml_trading
+```
+
+** Manage the scheduled job:**
+```bash
+# Unload (stop scheduling)
+launchctl unload ~/projects/ml_trading/com.ml_trading.train_model.plist
+```

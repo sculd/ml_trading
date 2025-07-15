@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Service identifier -->
+    <key>Label</key>
+    <string>com.ml_trading.train_model</string>
+    
+    <!-- Program to run -->
+    <key>Program</key>
+    <string>/Users/junlim/projects/ml_trading/main_train_model_and_upload.sh</string>
+    
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>/Users/junlim/projects/ml_trading</string>
+    
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>7</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    
+    <!-- Alternative: Run every 24 hours from first execution -->
+    <!-- Uncomment this instead of StartCalendarInterval if you prefer -->
+    <!--
+    <key>StartInterval</key>
+    <integer>86400</integer>
+    -->
+    
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:/opt/local/bin</string>
+        <key>HOME</key>
+        <string>/Users/junlim</string>
+        <key>USER</key>
+        <string>junlim</string>
+        <key>SHELL</key>
+        <string>/bin/zsh</string>
+        <!-- Add your custom environment variables here -->
+        <!--
+        <key>MARKET_VENV_BASE_DIR</key>
+        <string>/path/to/your/venv</string>
+        -->
+    </dict>
+    
+    <!-- Logging -->
+    <key>StandardOutPath</key>
+    <string>/Users/junlim/projects/ml_trading/logs/launchctl_stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/junlim/projects/ml_trading/logs/launchctl_stderr.log</string>
+    
+    <!-- Process management -->
+    <key>RunAtLoad</key>
+    <false/>
+    
+    <!-- Don't run if the previous job is still running -->
+    <key>LaunchOnlyOnce</key>
+    <false/>
+    
+    <!-- Restart on failure -->
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist> 
