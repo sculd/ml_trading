@@ -132,6 +132,7 @@ setup_virtual_environment() {
         source "$SCRIPT_DIR/venv/bin/activate"
         log_message "Activated local virtual environment"
         venv_activated=true
+    fi
     
     if [[ "$venv_activated" == "false" ]]; then
         log_message "WARNING: No virtual environment activated"
