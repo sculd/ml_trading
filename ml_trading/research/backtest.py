@@ -4,8 +4,6 @@ import datetime
 import multiprocessing
 from functools import partial
 from typing import Tuple, Optional, List, Dict, Any, Union
-from dataclasses import dataclass
-from sklearn.metrics import r2_score
 
 import market_data.ingest.bq.common
 import market_data.machine_learning.resample
@@ -77,17 +75,11 @@ def run_with_feature_column_prefix(
         ml_data: Optional[pd.DataFrame] = None,
         feature_column_prefixes = None,
         model_class_id = 'random_forest_regression',
-        use_multiprocessing: bool = True,
         n_processes: Optional[int] = None,
         ):
     '''
     Run backtesting with feature column filtering and optional multiprocessing.
-    
-    Args:
-        use_multiprocessing: Whether to use multiprocessing for model training (default: True)
-        n_processes: Number of processes to use (None = auto-detect based on CPU cores)
-        ... (other parameters as before)
-    
+
     The result would have the following columns:
     - y: Actual target values
     - pred: Model predictions
@@ -180,7 +172,7 @@ def run_with_feature_column_prefix(
     # Determine processing method and train models
     results = None
     
-    if use_multiprocessing and len(processed_datasets) > 1:
+    if len(processed_datasets) > 1:
         # Set number of processes
         if n_processes is None:
             n_processes = min(multiprocessing.cpu_count(), len(processed_datasets))
@@ -208,24 +200,6 @@ def run_with_feature_column_prefix(
             print(f"⚠️  Multiprocessing failed ({e}), falling back to sequential processing...")
             results = None  # Force sequential processing below
     
-    # If multiprocessing failed or wasn't used, run sequential processing
-    if results is None:
-        print(f"\n🔄 Starting sequential training of {len(processed_datasets)} models...")
-        
-        # Train models sequentially
-        results = []
-        for i, dataset in enumerate(processed_datasets):
-            print(f"Training model {i+1}/{len(processed_datasets)}...")
-            model, processed_validation_df = _train_model(
-                data_set=dataset,
-                target_column=target_column,
-                forward_return_column=forward_return_column,
-                model_class_id=model_class_id,
-            )
-            results.append((model, processed_validation_df))
-        
-        print("✅ Sequential training completed! Processing results...")
-
     # Process results
     for idx, (model, processed_validation_df) in enumerate(results):
         metadata = dataset_metadata[idx]
@@ -247,8 +221,6 @@ def run_with_feature_column_prefix(
         trade_stats_list.append(trade_stats)
         validation_y_df['model_num'] = metadata['index'] + 1
         all_validation_dfs.append(validation_y_df)
-
-
 
     # Print trade_stats summary
     for i, (train_timerange_str, validation_timerange_str, trade_stats) in enumerate(zip(train_timerange_strs, validaiton_timerange_strs, trade_stats_list)):
