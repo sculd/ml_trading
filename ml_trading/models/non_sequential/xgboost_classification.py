@@ -54,10 +54,10 @@ class XGBoostClassificationModel(ml_trading.models.model.BinaryClassificationMod
         if not os.path.exists(negative_model_filename):
             raise FileNotFoundError(f"Negative model file not found: {negative_model_filename}")
             
-        positive_model = xgb.XGBClassifier()
+        positive_model = xgb.XGBClassifier(n_jobs=-1)
         positive_model.load_model(positive_model_filename)
         
-        negative_model = xgb.XGBClassifier()
+        negative_model = xgb.XGBClassifier(n_jobs=-1)
         negative_model.load_model(negative_model_filename)
         
         # Create and return XGBoostClassificationModel instance

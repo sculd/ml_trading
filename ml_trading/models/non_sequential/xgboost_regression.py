@@ -44,7 +44,7 @@ class XGBoostModel(ml_trading.models.model.Model):
         if not os.path.exists(model_filename):
             raise FileNotFoundError(f"Model file not found: {model_filename}")
             
-        xgb_model = xgb.XGBRegressor()
+        xgb_model = xgb.XGBRegressor(n_jobs=-1)
         xgb_model.load_model(model_filename)
         
         # Create and return XGBoostModel instance

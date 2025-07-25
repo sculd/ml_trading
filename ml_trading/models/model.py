@@ -6,6 +6,7 @@ import json
 
 from ml_trading.models.util import into_X_y
 import ml_trading.research.backtest
+import ml_trading.research.trade_stats
 
 # Label mappings for dual binary classification models
 LABEL_MAP_POSITIVE = {-1: 0, 0: 0, 1: 1}  # +1 vs rest
@@ -103,7 +104,7 @@ class Model:
         validation_y_df['forward_return'] = forward_return_test.values
         validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
 
-        return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
+        return ml_trading.research.trade_stats.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
 
 
 class BinaryClassificationModel(Model):
@@ -259,7 +260,7 @@ class BinaryClassificationModel(Model):
         print(f"\nAccuracy comparison:")
         print(f"Custom thresholds: {accuracy_custom:.4f}")
 
-        return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
+        return ml_trading.research.trade_stats.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
 
 
 class MultiClassClassificationModel(Model):
@@ -422,5 +423,5 @@ class MultiClassClassificationModel(Model):
         print(f"\nAccuracy comparison:")
         print(f"Custom thresholds: {accuracy_custom:.4f}")
 
-        return ml_trading.research.backtest.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
+        return ml_trading.research.trade_stats.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
 

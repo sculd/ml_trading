@@ -2,6 +2,7 @@ import pandas as pd
 import datetime
 from typing import Tuple, Optional, List, Dict, Any, Union
 from dataclasses import dataclass
+from market_data.machine_learning.ml_data import prepare_ml_data
 from market_data.machine_learning.cache_ml_data import load_cached_ml_data
 from market_data.feature.impl.common import SequentialFeatureParam
 
@@ -233,6 +234,7 @@ def create_split_moving_forward(
     
     # Load the full dataset
     if ml_data is None:
+        #'''
         ml_data = load_cached_ml_data(
             dataset_mode=dataset_mode,
             export_mode=export_mode,
@@ -243,6 +245,21 @@ def create_split_moving_forward(
             resample_params=resample_params,
             seq_params=seq_params,
         )
+        #'''
+
+        '''
+        ml_data = prepare_ml_data(
+            dataset_mode=dataset_mode,
+            export_mode=export_mode,
+            aggregation_mode=aggregation_mode,
+            time_range=time_range,
+                feature_label_params=feature_label_params,
+            target_params_batch=target_params,
+            resample_params=resample_params,
+            seq_params=seq_params,
+        )
+        #'''
+
         #ml_data = ml_data.drop(columns=ema_columns + volume_ratio_columns + ['bb_width', 'obv_pct_change'])
 
     ml_data = _purge(ml_data, purge_params)
