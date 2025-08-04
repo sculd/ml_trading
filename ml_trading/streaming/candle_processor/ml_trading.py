@@ -6,7 +6,7 @@ import time
 from typing import List, Tuple, Dict, Any, Optional, Union
 import market_data.target.target 
 import market_data.machine_learning.resample as resample
-import ml_trading.machine_learning.validation_data as validation_data
+import ml_trading.machine_learning.validation as validation
 import ml_trading.streaming.candle_processor.base as base
 import ml_trading.streaming.candle_processor.cumsum_event as cumsum_event
 import market_data.feature.registry
@@ -24,7 +24,7 @@ class MLTradingProcessor(cumsum_event.CumsumEventBasedProcessor):
     def __init__(
             self, 
             resample_params: resample.ResampleParams, 
-            purge_params: validation_data.PurgeParams,
+            purge_params: validation.PurgeParams,
             model: Optional[ml_trading.models.model.Model] = None,
             prediction_threshold: float = 0.5,
             target_params: market_data.target.target.TargetParams = market_data.target.target.TargetParams(),

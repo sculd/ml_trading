@@ -11,7 +11,7 @@ import time
 import pytz
 from dataclasses import dataclass
 import market_data.machine_learning.resample as resample
-import ml_trading.machine_learning.validation_data as validation_data
+import ml_trading.machine_learning.validation as validation
 import ml_trading.streaming.candle_processor.ml_trading
 import ml_trading.live_trading.trade_execution.execution_okx
 import ml_trading.live_trading.util.symbols_okx
@@ -90,7 +90,7 @@ class LiveOkxStreamReader:
 
         self.candle_processor = ml_trading.streaming.candle_processor.ml_trading.MLTradingProcessor(
             resample_params=resample_params,
-            purge_params=validation_data.PurgeParams(
+            purge_params=validation.PurgeParams(
                 purge_period=datetime.timedelta(minutes=30)
             ),
             model=model,

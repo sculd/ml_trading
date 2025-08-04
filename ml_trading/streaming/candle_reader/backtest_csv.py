@@ -7,7 +7,7 @@ import ml_trading.streaming.candle_processor.base
 import ml_trading.streaming.candle_processor.cumsum_event
 import ml_trading.streaming.candle_processor.ml_trading
 import market_data.machine_learning.resample as resample
-import ml_trading.machine_learning.validation_data as validation_data
+import ml_trading.machine_learning.validation as validation
 import logging
 
 
@@ -26,7 +26,7 @@ class CSVCandleReader:
         self.candle_processor_ = ml_trading.streaming.candle_processor.cumsum_event.CumsumEventBasedProcessor(
             windows_size=60,
             resample_params=resample.ResampleParams(),
-            purge_params=validation_data.PurgeParams(
+            purge_params=validation.PurgeParams(
                 purge_period=datetime.timedelta(minutes=30)
             )
         )
@@ -35,7 +35,7 @@ class CSVCandleReader:
 
         self.candle_processor = ml_trading.streaming.candle_processor.ml_trading.MLTradingProcessor(
             resample_params=resample_params,
-            purge_params=validation_data.PurgeParams(
+            purge_params=validation.PurgeParams(
                 purge_period=datetime.timedelta(minutes=30)
             ),
             model=model,

@@ -1,13 +1,13 @@
 import pandas as pd
 import numpy as np
 import market_data.machine_learning.resample as resample
-import ml_trading.machine_learning.validation_data as validation_data
+import ml_trading.machine_learning.validation as validation
 import ml_trading.streaming.candle_processor.base as base
 import logging
 
 
 class CumsumEventBasedProcessor(base.CandleProcessorBase):
-    def __init__(self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams):
+    def __init__(self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation.PurgeParams):
         super().__init__(windows_size)
         self.resample_params = resample_params
         self.purge_params = purge_params
@@ -33,7 +33,7 @@ class CumsumEventBasedProcessor(base.CandleProcessorBase):
 
 
 class CumsumEventSeries(base.Series):
-    def __init__(self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation_data.PurgeParams, symbol: str):
+    def __init__(self, windows_size: int, resample_params: resample.ResampleParams, purge_params: validation.PurgeParams, symbol: str):
         super().__init__(windows_size, symbol)
         self.resample_params = resample_params
         self.purge_params = purge_params
