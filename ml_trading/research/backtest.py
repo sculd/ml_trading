@@ -1,20 +1,21 @@
 import pandas as pd
 import numpy as np
 import datetime
+import time
 import multiprocessing
 from functools import partial
 from typing import Tuple, Optional, List, Dict, Any, Union
 
-import market_data.ingest.bq.common
-import market_data.machine_learning.resample
 from market_data.feature.impl.common import SequentialFeatureParam
 
-import ml_trading.machine_learning.validation_data
+import ml_trading.machine_learning.validation
 import ml_trading.models.registry
-from ml_trading.machine_learning.validation_data import PurgeParams
+from ml_trading.machine_learning.validation_params import PurgeParams, EventBasedValidationParams
+from ml_trading.research.backtest_result import BacktestResult
+from ml_trading.research.trade_stats import get_print_trade_results
 
-from market_data.ingest.bq.common import DATASET_MODE, EXPORT_MODE, AGGREGATION_MODE
-
+import logging
+logger = logging.getLogger(__name__)
 
 def _train_model(
         data_set: Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame],
@@ -24,43 +25,40 @@ def _train_model(
         ) -> Any:
     """
     Train a model on the given training data.
-    
-    Args:
-        train_df: Training DataFrame
-        validation_df: Validation DataFrame (for size reporting)
-        target_column: Target column name
-        forward_return_column: Forward return column name
-        model_class_id: Model class identifier
-        
-    Returns:
-        Trained model instance
     """
     train_df, validation_df, test_df = data_set
     train_func = ml_trading.models.registry.get_train_function_by_label(model_class_id)
     if train_func is None:
         raise ValueError(f"No training function found for model class '{model_class_id}'")
 
+    logger.info(f"\n########################################################")
+    logger.info(f'train: {len(train_df)}, {train_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {train_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')
+    logger.info(f'validation: {len(validation_df)}, {validation_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {validation_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')
+
     # Report data sizes before and after dropna
     size_train_df = len(train_df)
     size_validation_df = len(validation_df)
     train_df = train_df.dropna(subset=[target_column, forward_return_column])
     validation_df = validation_df.dropna(subset=[target_column, forward_return_column])
-    print(f"train_df size: {size_train_df} -> {len(train_df)}")
-    print(f"validation_df size: {size_validation_df} -> {len(validation_df)}")
+    logger.info(f"train_df size: {size_train_df} -> {len(train_df)}")
+    logger.info(f"validation_df size: {size_validation_df} -> {len(validation_df)}")
     
     # Train the model
     model = train_func(train_df=train_df, target_column=target_column)
-    return model, validation_df
+
+    metadata ={
+        'train_timerange': f'{train_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {train_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}',
+        'validation_timerange': f'{validation_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {validation_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}'
+    }
+
+    return model, metadata, validation_df
 
 
 def run_with_feature_column_prefix(
-        dataset_mode: DATASET_MODE,
-        export_mode: EXPORT_MODE,
-        aggregation_mode: AGGREGATION_MODE,
-        time_range: market_data.util.time.TimeRange,
-        feature_label_params: List[Union[str, Tuple[str, Any]]],
-        target_params: market_data.target.target.TargetParamsBatch,
-        resample_params: market_data.machine_learning.resample.ResampleParams,
+        ml_data: pd.DataFrame,
+        dataset_mode: str = "UNKNOWN",
+        export_mode: str = "UNKNOWN", 
+        aggregation_mode: str = "UNKNOWN",
         forward_period = "10m",
         tp_label: str = "30",
         target_column: str = None,
@@ -72,41 +70,42 @@ def run_with_feature_column_prefix(
         step_event_size: int = 400,
         validation_fixed_event_size: int = 400,
         test_fixed_event_size: int = 0,
-        ml_data: Optional[pd.DataFrame] = None,
         feature_column_prefixes = None,
         model_class_id = 'random_forest_regression',
         n_processes: Optional[int] = None,
-        ):
+        processing_start_time: Optional[float] = None,
+        ) -> BacktestResult:
     '''
     Run backtesting with feature column filtering and optional multiprocessing.
-
-    The result would have the following columns:
-    - y: Actual target values
-    - pred: Model predictions
-    - forward_return: Forward returns
-    - model_num: Model number for tracking
-
-    Note that the result is indexed by timestamp and symbol.
+    
+    Returns a BacktestResult object containing:
+    - trade_stats: Comprehensive trading performance metrics
+    - validation_df: Combined validation DataFrame with predictions
+    - model configuration and validation parameters
+    - time ranges and processing metadata
     
     Processing behavior:
     - Sequential preprocessing: Overlap handling is done sequentially to maintain chronological order
     - Parallel training: Model training happens in parallel using multiprocessing (if enabled)
     - Sequential evaluation: Results are combined maintaining proper model numbering
     '''
-    data_sets = ml_trading.machine_learning.validation_data.create_split_moving_forward(
-        dataset_mode, export_mode, aggregation_mode,
-        time_range=time_range,
-        feature_label_params=feature_label_params,
-        initial_training_fixed_window_size = initial_training_fixed_window_size,
-        purge_params = purge_params,
-        target_params = target_params,
-        embargo_period = embargo_period,
-        resample_params = resample_params,
-        step_event_size = step_event_size,
-        validation_fixed_event_size = validation_fixed_event_size,
-        test_fixed_event_size = test_fixed_event_size,
-        window_type = window_type,
-        ml_data = ml_data,
+    if processing_start_time is None:
+        processing_start_time = time.time()
+    
+    # Create validation parameters object
+    validation_params = EventBasedValidationParams(
+        purge_params=purge_params,
+        embargo_period=embargo_period,
+        window_type=window_type,
+        initial_training_fixed_window_size=initial_training_fixed_window_size,
+        step_event_size=step_event_size,
+        validation_fixed_event_size=validation_fixed_event_size,
+        test_fixed_event_size=test_fixed_event_size,
+    )
+    
+    data_sets = ml_trading.machine_learning.validation.create_splits(
+        ml_data=ml_data,
+        validation_params=validation_params,
     )
 
     trade_stats_list = []
@@ -118,14 +117,7 @@ def run_with_feature_column_prefix(
     tpsl_return_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}_return'
     forward_return_column = f'label_forward_return_{forward_period}'
 
-    # Process datasets sequentially to handle overlaps, then train in parallel
     processed_datasets = []
-    dataset_metadata = []
-    
-    # State variables for overlap handling  
-    prev_validation_df = None
-    prev_test_df = None
-    
     for i, (train_df, validation_df, test_df) in enumerate(data_sets):
         # Apply feature column filtering if specified
         if feature_column_prefixes:
@@ -135,43 +127,12 @@ def run_with_feature_column_prefix(
             validation_df = validation_df[['symbol'] + feature_columns + label_columns]
             if len(test_df) > 0:
                 test_df = test_df[['symbol'] + feature_columns + label_columns]
-
-        # Handle overlaps with previous validation/test sets
-        if i > 0:
-            if prev_validation_df is not None and len(prev_validation_df) > 0 and len(validation_df) > 0:
-                prev_validation_tail_timestamp = prev_validation_df.tail(1).index[0]
-                prev_l = len(validation_df)
-                validation_df = validation_df[validation_df.index.get_level_values("timestamp") > prev_validation_tail_timestamp]
-                print(f"Validation df length: {len(validation_df)} (prev: {prev_l}, diff: {prev_l - len(validation_df)})")
-
-            if prev_test_df is not None and len(prev_test_df) > 0 and len(test_df) > 0:
-                prev_test_tail_timestamp = prev_test_df.tail(1).index[0]
-                test_df = test_df[test_df.index.get_level_values("timestamp") > prev_test_tail_timestamp]
-
-        # Update state for next iteration
-        prev_validation_df = validation_df
-        prev_test_df = test_df
-
-        # Skip if validation set is empty after overlap removal
-        if len(validation_df) == 0:
-            continue
-
-        print(f"\n########################################################")
-        print(f"Preparing model {i+1} of {len(data_sets)} for parallel training")
-        print(f'train: {len(train_df)}, {train_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {train_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')
-        print(f'validation: {len(validation_df)}, {validation_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {validation_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')
-
-        # Store processed dataset and metadata
         processed_datasets.append((train_df, validation_df, test_df))
-        dataset_metadata.append({
-            'index': i,
-            'train_timerange': f'{train_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {train_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}',
-            'validation_timerange': f'{validation_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {validation_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}'
-        })
 
+    processed_datasets = processed_datasets = ml_trading.machine_learning.validation.dedupe_validation_test_data(processed_datasets)
+    
     # Determine processing method and train models
     results = None
-    
     if len(processed_datasets) > 1:
         # Set number of processes
         if n_processes is None:
@@ -201,9 +162,7 @@ def run_with_feature_column_prefix(
             results = None  # Force sequential processing below
     
     # Process results
-    for idx, (model, processed_validation_df) in enumerate(results):
-        metadata = dataset_metadata[idx]
-        
+    for model, metadata, processed_validation_df in results:
         # Evaluate the model
         trade_stats, validation_y_df = model.evaluate_model(
             validation_df=processed_validation_df,
@@ -231,54 +190,36 @@ def run_with_feature_column_prefix(
               f"negative_win_rate: {trade_stats.negative_win_rate:.2f}"
               )
 
-    combined_validation_df = combine_validation_dfs(all_validation_dfs)
-
-    return combined_validation_df
-
-
-def combine_validation_dfs(all_validation_dfs):
-    """
-    Combine multiple validation dataframes adding model_num column.
+    combined_validation_df = ml_trading.machine_learning.validation.combine_validation_dfs(all_validation_dfs)
     
-    There is supposed to be some overlap in the period in the input, the first one is taken in the output.
-    The dataframes in the input is expected to have the following columns:
-    - y
-    - pred
-    - forward_return
-
-    The result would have the model_num column added.
-    Note that the input and result are indexed by timestamp and symbol.
-    """
+    # Calculate processing time
+    processing_time_seconds = time.time() - processing_start_time
     
-    # Combine all validation DataFrames
-    if not all_validation_dfs:
-        return pd.DataFrame()
-
-    # Concatenate all validation DataFrames
-    combined_validation_df = pd.concat(all_validation_dfs)
+    # Calculate trade statistics from the combined validation data
+    trade_stats = get_print_trade_results(
+        combined_validation_df, 
+        threshold=0.50, 
+        tp_label=tp_label
+    )
     
-    # Check if we need to deduplicate (will have the same index if overlapping)
-    if len(combined_validation_df) > combined_validation_df.index.nunique():
-        print(f"\nFound duplicate timestamps in validation sets, deduplicating...")
-        
-        # Group by index and take the prediction from the first model
-        # Sort by index and model number (ascending)
-        combined_validation_df = combined_validation_df.reset_index()
-        combined_validation_df = combined_validation_df.sort_values(
-            ['timestamp', 'symbol', 'model_num'], 
-            ascending=[True, True, True]
-        )
-        
-        # Drop duplicates, keeping the first occurrence (which has earliest model number)
-        combined_validation_df = combined_validation_df.drop_duplicates(subset=['timestamp', 'symbol'], keep='first')
-        
-        # Reset index
-        combined_validation_df = combined_validation_df.set_index(['timestamp', 'symbol'])
+    # Create and return BacktestResult
+    backtest_result = BacktestResult.from_backtest_run(
+        trade_stats=trade_stats,
+        validation_df=combined_validation_df,
+        model_class_id=model_class_id,
+        target_column=target_column or f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}',
+        tp_label=tp_label,
+        forward_period=forward_period,
+        train_timeranges=train_timerange_strs,
+        validation_timeranges=validaiton_timerange_strs,
+        dataset_mode=dataset_mode,
+        export_mode=export_mode,
+        aggregation_mode=aggregation_mode,
+        validation_params=validation_params,
+        feature_column_prefixes=feature_column_prefixes,
+        feature_label_params=[str(seq_params)] if seq_params else [],
+        n_processes=n_processes,
+        processing_time_seconds=processing_time_seconds,
+    )
     
-    print(f"Combined validation data shape: {combined_validation_df.shape}")
-    print(f"Unique timestamps: {combined_validation_df.index.get_level_values('timestamp').nunique()}")
-    print(f"Unique symbols: {combined_validation_df.index.get_level_values('symbol').nunique()}")
-    
-    # Optionally save the combined validation data
-    # combined_validation_df.to_csv('combined_validation_predictions.csv')
-    return combined_validation_df
+    return backtest_result
