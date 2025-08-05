@@ -236,6 +236,31 @@ class TradeStats:
         result += f"\nTotal score: {self.total_score:.4f}"
         return result
     
+    def to_dict(self) -> dict:
+        """Convert TradeStats to dictionary for serialization"""
+        return {
+            'total_trades': self.total_trades,
+            'avg_return': self.avg_return,
+            'total_return': self.total_return,
+            'total_score': self.total_score,
+            'win_rate': self.win_rate,
+            'loss_rate': self.loss_rate,
+            'draw_rate': self.draw_rate,
+            'draw_win_rate': self.draw_win_rate,
+            'draw_return': self.draw_return,
+            'draw_score': self.draw_score,
+            'positive_win_rate': self.positive_win_rate,
+            'negative_win_rate': self.negative_win_rate,
+            'neutral_win_rate': self.neutral_win_rate,
+            'positive_recall': self.positive_recall,
+            'negative_recall': self.negative_recall,
+            'neutral_recall': self.neutral_recall,
+            'mae': self.mae,
+            'mse': self.mse,
+            'r2': self.r2,
+            'r2_trades': self.r2_trades,
+        }
+    
     def print_stats(self, threshold: float, date_range: str = ""):
         """Print formatted trading statistics"""
         print(f"\nTrade statistics (threshold={threshold}):")

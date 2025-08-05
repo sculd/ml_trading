@@ -162,10 +162,10 @@ def run_with_feature_column_prefix(
             results = None  # Force sequential processing below
     
     # Process results
-    for model, metadata, processed_validation_df in results:
+    for i, (model, metadata, validation_df) in enumerate(results):
         # Evaluate the model
         trade_stats, validation_y_df = model.evaluate_model(
-            validation_df=processed_validation_df,
+            validation_df=validation_df,
             tp_label=tp_label,
             target_column=target_column,
             tpsl_return_column=tpsl_return_column,
@@ -173,18 +173,12 @@ def run_with_feature_column_prefix(
             prediction_threshold=0.50
         )
 
-        # Record results using stored metadata
-        train_timerange_strs.append(metadata['train_timerange'])
-        validaiton_timerange_strs.append(metadata['validation_timerange'])
-        
         trade_stats_list.append(trade_stats)
-        validation_y_df['model_num'] = metadata['index'] + 1
+        validation_y_df['model_num'] = i
         all_validation_dfs.append(validation_y_df)
-
-    # Print trade_stats summary
-    for i, (train_timerange_str, validation_timerange_str, trade_stats) in enumerate(zip(train_timerange_strs, validaiton_timerange_strs, trade_stats_list)):
-        print(f"{i+1}, train (size: {len(train_df)}): {train_timerange_str}\n"
-              f"validation (size: {len(validation_y_df)}): {validation_timerange_str}, "
+        
+        print(f"{i+1}, train (size: {len(train_df)}): {metadata['train_timerange']}\n"
+              f"validation (size: {len(validation_y_df)}): {metadata['validation_timerange']}, "
               f"out of {trade_stats.total_trades}, ",
               f"positive_win_rate: {trade_stats.positive_win_rate:.2f}, "
               f"negative_win_rate: {trade_stats.negative_win_rate:.2f}"

@@ -10,7 +10,7 @@ import market_data.feature.registry
 
 import market_data.machine_learning.cache_ml_data
 import ml_trading.models.manager
-import ml_trading.machine_learning.validation_data
+import ml_trading.machine_learning.validation
 import ml_trading.models.non_sequential.xgboost_regression
 import ml_trading.models.non_sequential.mlp_deep_model
 from ml_trading.machine_learning.train import TrainingParams, train_model
@@ -151,4 +151,39 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Parse resample parameters
+    resample_params = None
+    resample_params = main_util.parse_resample_params("close,0.1")
+    
+    # Calculate time range if time_period is specified
+    training_time_range = None
+    duration = parse_duration("100d")
+    yesterday = datetime.datetime.now().date() - datetime.timedelta(days=1)
+    start_date = yesterday - duration
+    training_time_range = market_data.util.time.TimeRange(
+        date_str_from=start_date.strftime('%Y-%m-%d'),
+        date_str_to=yesterday.strftime('%Y-%m-%d')
+    )
+    
+    # Parse feature labels
+    feature_labels = parse_feature_labels("all")
+    
+    # Create training parameters
+    training_params = TrainingParams(
+        target_column="label_long_tp30_sl30_10m",
+        resample_params=resample_params,
+        model_class_id="random_forest_classification",
+        feature_labels=feature_labels,
+        training_time_range=training_time_range,
+        training_set_size=None
+    )
+    
+    # Train the model
+    model = train_model(training_params)
+    
+    # Save the model
+    model_manager = ml_trading.models.manager.ModelManager()
+    model_manager.save_model_to_local("rf_testrun", model)
+
+    #main()
+

@@ -230,16 +230,7 @@ class BacktestResult:
             'aggregation_mode': self.aggregation_mode,
             'validation_params': self.validation_params.to_dict(),
             'feature_column_prefixes': self.feature_column_prefixes,
-            'trade_stats': {
-                'total_trades': self.trade_stats.total_trades,
-                'avg_return': self.trade_stats.avg_return,
-                'total_return': self.trade_stats.total_return,
-                'total_score': self.trade_stats.total_score,
-                'win_rate': self.trade_stats.win_rate,
-                'loss_rate': self.trade_stats.loss_rate,
-                'r2': self.trade_stats.r2,
-                'r2_trades': self.trade_stats.r2_trades,
-            },
+            'trade_stats': self.trade_stats.to_dict(),
             'notes': self.notes,
         }
     
@@ -330,7 +321,7 @@ class BacktestResult:
         # Flatten trade stats with 'trade_' prefix
         trade_stats = base_dict.get('trade_stats', {})
         for key, value in trade_stats.items():
-            flattened[f'trade_{key}'] = value
+            flattened[key] = value
         
         # Flatten validation params with 'val_' prefix
         val_params = base_dict.get('validation_params', {})
@@ -398,7 +389,7 @@ class BacktestResult:
         model_performance = []
         
         for i in range(self.n_models):
-            model_num = i + 1
+            model_num = i
             model_data = self.validation_df[self.validation_df['model_num'] == model_num]
             
             if len(model_data) > 0:

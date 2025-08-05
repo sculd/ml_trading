@@ -298,7 +298,7 @@ def _only_after_prev(prev_df, cur_df):
     prev_tail_timestamp = prev_df.tail(1).index.get_level_values("timestamp")[0]
     prev_l = len(cur_df)
     cur_df = cur_df[cur_df.index.get_level_values("timestamp") > prev_tail_timestamp]
-    print(f"Only after prev df length: {len(cur_df)} (prev: {prev_l}, diff: {prev_l - len(cur_df)})")
+    print(f"Pruning after prev df, length: {len(cur_df)} (prev: {prev_l}, diff: {prev_l - len(cur_df)})")
     return cur_df
 
 
