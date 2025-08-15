@@ -9,7 +9,7 @@ import market_data.util
 import market_data.util.time
 import market_data.machine_learning.resample
 
-import market_data.machine_learning.cache_ml_data
+import market_data.machine_learning.ml_data.cache
 import market_data.feature.registry
 from ml_trading.models.registry import get_train_function_by_label
 
@@ -68,7 +68,7 @@ class TrainingParams:
 
 def _get_train_df(training_params: TrainingParams):
     if training_params.training_time_range is not None:
-        train_df = market_data.machine_learning.cache_ml_data.load_cached_ml_data(
+        train_df = market_data.machine_learning.ml_data.cache.load_cached_ml_data(
             market_data.ingest.bq.common.DATASET_MODE.OKX, market_data.ingest.bq.common.EXPORT_MODE.BY_MINUTE, market_data.ingest.bq.common.AGGREGATION_MODE.TAKE_LASTEST,
             time_range=training_params.get_time_range(),
             resample_params = training_params.resample_params,
@@ -93,7 +93,7 @@ def _get_train_df(training_params: TrainingParams):
             date_str_to=date_str_to
         )
         
-        train_df = market_data.machine_learning.cache_ml_data.load_cached_ml_data(
+        train_df = market_data.machine_learning.ml_data.cache.load_cached_ml_data(
             market_data.ingest.bq.common.DATASET_MODE.OKX, market_data.ingest.bq.common.EXPORT_MODE.BY_MINUTE, market_data.ingest.bq.common.AGGREGATION_MODE.TAKE_LASTEST,
             time_range=time_range,
             resample_params=training_params.resample_params,
@@ -111,7 +111,7 @@ def _get_train_df(training_params: TrainingParams):
             )
             
             # Load data with expanded time range
-            train_df = market_data.machine_learning.cache_ml_data.load_cached_ml_data(
+            train_df = market_data.machine_learning.ml_data.cache.load_cached_ml_data(
                 market_data.ingest.bq.common.DATASET_MODE.OKX, market_data.ingest.bq.common.EXPORT_MODE.BY_MINUTE, market_data.ingest.bq.common.AGGREGATION_MODE.TAKE_LASTEST,
                 time_range=time_range,
                 resample_params=training_params.resample_params,

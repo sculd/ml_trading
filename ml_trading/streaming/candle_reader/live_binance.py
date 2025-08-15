@@ -1,8 +1,7 @@
 import datetime, time, os
 import time, os, datetime, logging, json, threading
 import pandas as pd, numpy as np
-import ml_trading.live_trading.util.binance
-import ml_trading.live_trading.util.symbols_binance
+import ml_trading.streaming.live_trading.util.symbols_binance
 
 from binance import ThreadedWebsocketManager
 
@@ -74,7 +73,7 @@ class PriceCache:
             self.bm.stop()
             time.sleep(2)
 
-        self.symbols = ml_trading.live_trading.util.symbols_binance.get_future_symbobls_usd()
+        self.symbols = ml_trading.streaming.live_trading.util.symbols_binance.get_future_symbobls_usd()
         sl = list(map(lambda s: s.lower() + '@kline_1m', self.symbols))
         logging.info('starting a new socket')
 

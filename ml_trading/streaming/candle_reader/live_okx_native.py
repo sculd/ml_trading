@@ -13,8 +13,8 @@ from dataclasses import dataclass
 import market_data.machine_learning.resample as resample
 import ml_trading.machine_learning.validation as validation
 import ml_trading.streaming.candle_processor.ml_trading
-import ml_trading.live_trading.trade_execution.execution_okx
-import ml_trading.live_trading.util.symbols_okx
+import ml_trading.streaming.live_trading.trade_execution.execution_okx
+import ml_trading.streaming.live_trading.util.symbols_okx
 import ml_trading.models.updater
 
 _ws_address = "wss://ws.okx.com:8443/ws/v5/business"
@@ -66,7 +66,7 @@ def _message_to_bwt_dicts(symbol, data):
 class LiveOkxStreamReader:
     def __init__(
             self, 
-            okx_trade_execution_params: ml_trading.live_trading.trade_execution.execution_okx.OkxTradeExecutionParams,
+            okx_trade_execution_params: ml_trading.streaming.live_trading.trade_execution.execution_okx.OkxTradeExecutionParams,
             updater_params: ml_trading.models.updater.ModelUpdaterParams = None,
             reader_params: LiveOkxStreamReaderParams = None,
             resample_params: resample.ResampleParams = None,
@@ -86,7 +86,7 @@ class LiveOkxStreamReader:
             prediction_threshold = 0.5
 
         resample_params = resample_params or resample.ResampleParams()
-        okx_live_trade_execution = ml_trading.live_trading.trade_execution.execution_okx.TradeExecution(okx_trade_execution_params)
+        okx_live_trade_execution = ml_trading.streaming.live_trading.trade_execution.execution_okx.TradeExecution(okx_trade_execution_params)
 
         self.candle_processor = ml_trading.streaming.candle_processor.ml_trading.MLTradingProcessor(
             resample_params=resample_params,
@@ -148,7 +148,7 @@ class LiveOkxStreamReader:
                     
                     # Subscribe to candle data channels
                     # Get the list of symbols to subscribe to
-                    symbols = ml_trading.live_trading.util.symbols_okx.get_swap_symbobls_usdt()
+                    symbols = ml_trading.streaming.live_trading.util.symbols_okx.get_swap_symbobls_usdt()
                     channels = [{"channel": "candle1m", "instId": symbol} for symbol in symbols]
                     subscribe_message = {
                         "op": "subscribe",

@@ -1,8 +1,8 @@
 import logging, os, requests
 from collections import defaultdict
 from dataclasses import dataclass
-import ml_trading.live_trading.publish.telegram
-from ml_trading.live_trading.trade_execution.throttle import Throttle, ThrottleConfig
+import ml_trading.streaming.live_trading.publish.telegram
+from ml_trading.streaming.live_trading.trade_execution.throttle import Throttle, ThrottleConfig
 import hmac
 import hashlib
 import base64
@@ -226,14 +226,14 @@ class TradeExecution:
         if not self.throttle.can_execute(epoch_seconds, symbol):
             message = f'[RATE LIMITED] at {epoch_seconds}, for {symbol}, side: {side} - execution rejected due to rate limits'
             logging.warning(message)
-            ml_trading.live_trading.publish.telegram.post_message(message)
+            ml_trading.streaming.live_trading.publish.telegram.post_message(message)
             return
         
         price = get_current_price(symbol)
 
         message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, side: {side}'
         logging.info(message)
-        ml_trading.live_trading.publish.telegram.post_message(message)
+        ml_trading.streaming.live_trading.publish.telegram.post_message(message)
 
         if self.direction_per_symbol[symbol] == 1:
             return
@@ -288,14 +288,14 @@ class TradeExecution:
         if not self.throttle.can_execute(epoch_seconds, symbol):
             message = f'[RATE LIMITED TP/SL] at {epoch_seconds}, for {symbol}, side: {side} - execution rejected due to rate limits'
             logging.warning(message)
-            ml_trading.live_trading.publish.telegram.post_message(message)
+            ml_trading.streaming.live_trading.publish.telegram.post_message(message)
             return
         
         price = get_current_price(symbol)
 
         message = f'[enter] at {epoch_seconds}, for {symbol}, prices: {price}, direction: enter, side: {side}'
         logging.info(message)
-        ml_trading.live_trading.publish.telegram.post_message(message)
+        ml_trading.streaming.live_trading.publish.telegram.post_message(message)
 
         if self.direction_per_symbol[symbol] == 1:
             return
@@ -372,7 +372,7 @@ class TradeExecution:
         price = get_current_price(symbol)
         message = f'[exit] at {epoch_seconds}, for {symbol}, prices: {price}, direction: exit'
         logging.info(message)
-        ml_trading.live_trading.publish.telegram.post_message(message)
+        ml_trading.streaming.live_trading.publish.telegram.post_message(message)
 
         if self.direction_per_symbol[symbol] != 1:
             return

@@ -8,7 +8,7 @@ import sys
 import os
 from datetime import datetime
 import setup_env # needed for the environment variables
-import ml_trading.live_trading.trade_execution.execution_okx
+import ml_trading.streaming.live_trading.trade_execution.execution_okx
 from ml_trading.streaming.candle_reader.live_okx_native import LiveOkxStreamReader, LiveOkxStreamReaderParams
 from ml_trading.models.updater import ModelUpdaterParams
 import main_util
@@ -54,7 +54,7 @@ def run_live(
         score_threshold: Optional[float] = None,
 ):
     # Configure trade execution parameters
-    okx_trade_execution_params = ml_trading.live_trading.trade_execution.execution_okx.OkxTradeExecutionParams(
+    okx_trade_execution_params = ml_trading.streaming.live_trading.trade_execution.execution_okx.OkxTradeExecutionParams(
         target_betsize=betsize,
         leverage=leverage,
         is_dry_run=dryrun,

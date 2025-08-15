@@ -56,7 +56,7 @@ if __name__ == '__main__':
     #'''
 
 
-    combined_validation_df = ml_trading.research.backtest.run_with_feature_column_prefix(
+    backtest_result = ml_trading.research.backtest.run_with_feature_column_prefix(
         ml_data,
         market_data.ingest.common.DATASET_MODE.OKX, 
         market_data.ingest.common.EXPORT_MODE.BY_MINUTE, 
@@ -79,20 +79,20 @@ if __name__ == '__main__':
     #combined_validation_df.to_parquet('crypto_result_2024_2025_resample10.parquet')
 
     # Get the last date in the dataframe
-    last_date = combined_validation_df.index.get_level_values('timestamp').max()
+    last_date = backtest_result.validation_df.index.get_level_values('timestamp').max()
     # Calculate the date one month before
     one_month_ago = last_date - pd.Timedelta(days=30)
 
     # Split the data into full period and last month
-    last_month_df = combined_validation_df[combined_validation_df.index.get_level_values('timestamp') >= one_month_ago]
+    last_month_df = backtest_result.validation_df[backtest_result.validation_df.index.get_level_values('timestamp') >= one_month_ago]
 
     print("\nFull period")
-    trade_results = ml_trading.research.trade_stats.get_print_trade_results(combined_validation_df, threshold=0.8, tp_label=tp_label)
+    trade_results = ml_trading.research.trade_stats.get_print_trade_results(backtest_result.validation_df, threshold=0.8, tp_label=tp_label)
     print("\nLast month")
     trade_results = ml_trading.research.trade_stats.get_print_trade_results(last_month_df, threshold=0.8, tp_label=tp_label)
 
     print("\nFull period")
-    trade_results = ml_trading.research.trade_stats.get_print_trade_results(combined_validation_df, threshold=0.5, tp_label=tp_label)
+    trade_results = ml_trading.research.trade_stats.get_print_trade_results(backtest_result.validation_df, threshold=0.5, tp_label=tp_label)
     print("\nLast month")
     trade_results = ml_trading.research.trade_stats.get_print_trade_results(last_month_df, threshold=0.5, tp_label=tp_label)
     #'''
