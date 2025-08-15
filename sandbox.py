@@ -9,26 +9,24 @@ import market_data.util.time
 
 import market_data.util
 import market_data.util.time
+import market_data.ingest.common
+from market_data.ingest.common import CacheContext, DATASET_MODE, EXPORT_MODE, AGGREGATION_MODE
 import market_data.machine_learning.resample
 import market_data.feature.registry
-from market_data.feature.impl.common import SequentialFeatureParam
-from market_data.target.target import TargetParamsBatch, TargetParams
+from market_data.feature.label import FeatureLabel, FeatureLabelCollection
+from market_data.machine_learning.ml_data.cache import load_cached_ml_data, calculate_and_cache_ml_data
+from market_data.feature.param import SequentialFeatureParam
+from market_data.target.param import TargetParamsBatch, TargetParams
+from market_data.machine_learning.resample.calc import CumSumResampleParams
 
 import ml_trading.models.registry
-import ml_trading.machine_learning.validation_data
-import ml_trading.models.non_sequential.xgboost_regression
-import ml_trading.models.non_sequential.xgboost_classification
-import ml_trading.models.non_sequential.random_forest_regression
-import ml_trading.models.non_sequential.random_forest_classification
-import ml_trading.models.non_sequential.mlp_deep_model
-import ml_trading.models.non_sequential.lightgbm_regression
-import ml_trading.models.non_sequential.lightgbm_classification
+import ml_trading.machine_learning.validation
 import ml_trading.research.backtest
 import ml_trading.research.trade_stats
 
 time_range = market_data.util.time.TimeRange(
     #date_str_from='2024-01-01', date_str_to='2025-05-10',
-    date_str_from='2024-10-01', date_str_to='2025-07-23',
+    date_str_from='2024-10-01', date_str_to='2025-07-01',
     )
 
 target_params_batch = TargetParamsBatch(
@@ -43,17 +41,30 @@ tp_label = "30"
 forward_period = "10m"
 
 if __name__ == '__main__':
-    combined_validation_df = ml_trading.research.backtest.run_with_feature_column_prefix(
-        market_data.ingest.bq.common.DATASET_MODE.OKX, 
-        market_data.ingest.bq.common.EXPORT_MODE.BY_MINUTE, 
-        market_data.ingest.bq.common.AGGREGATION_MODE.TAKE_LASTEST,
-        feature_label_params = market_data.feature.registry.list_registered_features('all'),
+    feature_labels = market_data.feature.registry.list_registered_features('all')
+    feature_collection = FeatureLabelCollection()
+    for feature_label in feature_labels:
+        feature_collection = feature_collection.with_feature_label(FeatureLabel(feature_label))
+    #'''
+    ml_data = load_cached_ml_data(
+        CacheContext(market_data.ingest.common.DATASET_MODE.OKX, market_data.ingest.common.EXPORT_MODE.BY_MINUTE, market_data.ingest.common.AGGREGATION_MODE.TAKE_LATEST),
         time_range=time_range,
+        feature_collection = feature_collection,
+        target_params_batch=target_params_batch,
+        resample_params=CumSumResampleParams(price_col = 'close', threshold = 0.1),
+    )
+    #'''
+
+
+    combined_validation_df = ml_trading.research.backtest.run_with_feature_column_prefix(
+        ml_data,
+        market_data.ingest.common.DATASET_MODE.OKX, 
+        market_data.ingest.common.EXPORT_MODE.BY_MINUTE, 
+        market_data.ingest.common.AGGREGATION_MODE.TAKE_LATEST,
+        #feature_label_params = market_data.feature.registry.list_registered_features('all'),
         initial_training_fixed_window_size = datetime.timedelta(days=100),
-        purge_params = ml_trading.machine_learning.validation_data.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
+        purge_params = ml_trading.machine_learning.validation.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
         embargo_period = datetime.timedelta(days=1),
-        target_params = target_params_batch,
-        resample_params = market_data.machine_learning.resample.ResampleParams(price_col = 'close', threshold = 0.1),
         forward_period = forward_period,
         tp_label = tp_label,
         target_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}_score',

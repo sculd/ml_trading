@@ -6,7 +6,7 @@ import multiprocessing
 from functools import partial
 from typing import Tuple, Optional, List, Dict, Any, Union
 
-from market_data.feature.impl.common import SequentialFeatureParam
+from market_data.feature.param import SequentialFeatureParam
 
 import ml_trading.machine_learning.validation
 import ml_trading.models.registry
