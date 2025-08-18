@@ -7,6 +7,7 @@ from typing import Optional, List, Dict, Any, Union
 from dataclasses import dataclass
 from ml_trading.research.trade_stats import TradeStats
 from ml_trading.machine_learning.validation_params import ValidationParamsType
+from ml_trading.research.backtest_config import BacktestConfig
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +25,8 @@ class BacktestResult:
     trade_stats: TradeStats
     validation_df: pd.DataFrame  # Combined validation predictions with y, pred, forward_return, model_num
     
-    # Model Configuration
-    model_class_id: str
-    target_column: str
-    tp_label: str
-    forward_period: str
+    # Configuration
+    backtest_config: BacktestConfig
     
     # Time Ranges
     overall_start_date: datetime.datetime
@@ -36,16 +34,7 @@ class BacktestResult:
     train_timeranges: List[str]  # List of "YYYY-MM-DD HH:MM:SS - YYYY-MM-DD HH:MM:SS" strings
     validation_timeranges: List[str]
     
-    # Dataset Configuration
-    dataset_mode: str  # DATASET_MODE enum as string
-    export_mode: str   # EXPORT_MODE enum as string
-    aggregation_mode: str  # AGGREGATION_MODE enum as string
-    
-    # Validation Configuration
-    validation_params: ValidationParamsType
-    
     # Feature Configuration
-    feature_column_prefixes: Optional[List[str]]
     feature_label_params: List[Union[str, tuple]]
     
     # Processing Configuration
@@ -62,6 +51,43 @@ class BacktestResult:
         """Post-initialization to set created_at if not provided"""
         if not hasattr(self, 'created_at') or self.created_at is None:
             self.created_at = datetime.datetime.now()
+    
+    # Backward compatibility properties - delegate to backtest_config
+    @property
+    def model_class_id(self) -> str:
+        return self.backtest_config.model_class_id
+    
+    @property
+    def target_column(self) -> str:
+        return self.backtest_config.target_column
+    
+    @property
+    def tp_label(self) -> str:
+        return self.backtest_config.tp_label
+    
+    @property
+    def forward_period(self) -> str:
+        return self.backtest_config.forward_period
+    
+    @property
+    def validation_params(self) -> ValidationParamsType:
+        return self.backtest_config.validation_params
+    
+    @property
+    def feature_column_prefixes(self) -> Optional[List[str]]:
+        return self.backtest_config.feature_column_prefixes if self.backtest_config.feature_column_prefixes else None
+    
+    @property
+    def dataset_mode(self) -> str:
+        return self.backtest_config.cache_context.dataset_mode.name
+    
+    @property
+    def export_mode(self) -> str:
+        return self.backtest_config.cache_context.export_mode.name
+    
+    @property
+    def aggregation_mode(self) -> str:
+        return self.backtest_config.cache_context.aggregation_mode.name
     
     @property
     def total_duration(self) -> datetime.timedelta:
@@ -239,17 +265,9 @@ class BacktestResult:
         cls,
         trade_stats: TradeStats,
         validation_df: pd.DataFrame,
-        model_class_id: str,
-        target_column: str,
-        tp_label: str,
-        forward_period: str,
+        backtest_config: BacktestConfig,
         train_timeranges: List[str],
         validation_timeranges: List[str],
-        dataset_mode: str,
-        export_mode: str,
-        aggregation_mode: str,
-        validation_params: ValidationParamsType,
-        feature_column_prefixes: Optional[List[str]] = None,
         feature_label_params: Optional[List[Union[str, tuple]]] = None,
         n_processes: Optional[int] = None,
         processing_time_seconds: Optional[float] = None,
@@ -267,24 +285,16 @@ class BacktestResult:
         overall_start_date = timestamps.min()
         overall_end_date = timestamps.max()
         
-        logger.debug(f"Creating BacktestResult for {model_class_id} covering {overall_start_date} to {overall_end_date}")
+        logger.debug(f"Creating BacktestResult for {backtest_config.model_class_id} covering {overall_start_date} to {overall_end_date}")
         
         return cls(
             trade_stats=trade_stats,
             validation_df=validation_df,
-            model_class_id=model_class_id,
-            target_column=target_column,
-            tp_label=tp_label,
-            forward_period=forward_period,
+            backtest_config=backtest_config,
             overall_start_date=overall_start_date,
             overall_end_date=overall_end_date,
             train_timeranges=train_timeranges,
             validation_timeranges=validation_timeranges,
-            dataset_mode=dataset_mode,
-            export_mode=export_mode,
-            aggregation_mode=aggregation_mode,
-            validation_params=validation_params,
-            feature_column_prefixes=feature_column_prefixes,
             feature_label_params=feature_label_params or [],
             n_models=len(train_timeranges),
             n_processes=n_processes,

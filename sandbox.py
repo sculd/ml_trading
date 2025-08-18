@@ -45,16 +45,14 @@ if __name__ == '__main__':
     feature_collection = FeatureLabelCollection()
     for feature_label in feature_labels:
         feature_collection = feature_collection.with_feature_label(FeatureLabel(feature_label))
-    #'''
+
     ml_data = load_cached_ml_data(
-        CacheContext(market_data.ingest.common.DATASET_MODE.OKX, market_data.ingest.common.EXPORT_MODE.BY_MINUTE, market_data.ingest.common.AGGREGATION_MODE.TAKE_LATEST),
+        CacheContext(DATASET_MODE.OKX, EXPORT_MODE.BY_MINUTE, AGGREGATION_MODE.TAKE_LATEST),
         time_range=time_range,
         feature_collection = feature_collection,
         target_params_batch=target_params_batch,
         resample_params=CumSumResampleParams(price_col = 'close', threshold = 0.1),
     )
-    #'''
-
 
     backtest_result = ml_trading.research.backtest.run_with_feature_column_prefix(
         ml_data,
@@ -64,7 +62,7 @@ if __name__ == '__main__':
         #feature_label_params = market_data.feature.registry.list_registered_features('all'),
         initial_training_fixed_window_size = datetime.timedelta(days=100),
         purge_params = ml_trading.machine_learning.validation.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
-        embargo_period = datetime.timedelta(days=1),
+        embargo_period = datetime.timedelta(days=0),
         forward_period = forward_period,
         tp_label = tp_label,
         target_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}_score',

@@ -268,6 +268,7 @@ def create_event_based_splits(
         test_df = ml_data.iloc[test_start_i:test_end_i] if validation_params.test_fixed_event_size > 0 else pd.DataFrame()
         
         # Add the split to the list
+        logging.info(f"train_df: {len(train_df)}, validation_df: {len(validation_df)}, test_df: {len(test_df)}")
         splits.append((train_df, validation_df, test_df))
         
         # Move to the next window - both start and end move by step_event_size
@@ -298,7 +299,7 @@ def _only_after_prev(prev_df, cur_df):
     prev_tail_timestamp = prev_df.tail(1).index.get_level_values("timestamp")[0]
     prev_l = len(cur_df)
     cur_df = cur_df[cur_df.index.get_level_values("timestamp") > prev_tail_timestamp]
-    print(f"Pruning after prev df, length: {len(cur_df)} (prev: {prev_l}, diff: {prev_l - len(cur_df)})")
+    logger.info(f"Pruning after prev df, length: {len(cur_df)} (prev: {prev_l}, diff: {prev_l - len(cur_df)})")
     return cur_df
 
 
@@ -346,7 +347,7 @@ def combine_validation_dfs(all_validation_dfs):
     
     # Check if we need to deduplicate (will have the same index if overlapping)
     if len(combined_validation_df) > combined_validation_df.index.nunique():
-        print(f"\nFound duplicate timestamps in validation sets, deduplicating...")
+        logger.info(f"\nFound duplicate timestamps in validation sets, deduplicating...")
         
         # Group by index and take the prediction from the first model
         # Sort by index and model number (ascending)
@@ -362,9 +363,9 @@ def combine_validation_dfs(all_validation_dfs):
         # Reset index
         combined_validation_df = combined_validation_df.set_index(['timestamp', 'symbol'])
     
-    print(f"Combined validation data shape: {combined_validation_df.shape}")
-    print(f"Unique timestamps: {combined_validation_df.index.get_level_values('timestamp').nunique()}")
-    print(f"Unique symbols: {combined_validation_df.index.get_level_values('symbol').nunique()}")
+    logger.info(f"Combined validation data shape: {combined_validation_df.shape}")
+    logger.info(f"Unique timestamps: {combined_validation_df.index.get_level_values('timestamp').nunique()}")
+    logger.info(f"Unique symbols: {combined_validation_df.index.get_level_values('symbol').nunique()}")
     
     # Optionally save the combined validation data
     # combined_validation_df.to_csv('combined_validation_predictions.csv')

@@ -12,6 +12,7 @@ import ml_trading.machine_learning.validation
 import ml_trading.models.registry
 from ml_trading.machine_learning.validation_params import PurgeParams, EventBasedValidationParams
 from ml_trading.research.backtest_result import BacktestResult
+from ml_trading.research.backtest_config import BacktestConfig
 from ml_trading.research.trade_stats import get_print_trade_results
 
 import logging
@@ -56,56 +57,17 @@ def _train_model(
 
 def run_with_feature_column_prefix(
         ml_data: pd.DataFrame,
-        dataset_mode: str = "UNKNOWN",
-        export_mode: str = "UNKNOWN", 
-        aggregation_mode: str = "UNKNOWN",
-        forward_period = "10m",
-        tp_label: str = "30",
-        target_column: str = None,
+        backtest_config: BacktestConfig,
         seq_params: Optional[SequentialFeatureParam] = None,
-        purge_params: PurgeParams = PurgeParams(purge_period = datetime.timedelta(minutes=30)),
-        embargo_period: datetime.timedelta = datetime.timedelta(days=1),
-        window_type: str = 'fixed',  # 'fixed' or 'expanding'
-        initial_training_fixed_window_size: datetime.timedelta = datetime.timedelta(days=100),
-        step_event_size: int = 400,
-        validation_fixed_event_size: int = 400,
-        test_fixed_event_size: int = 0,
-        feature_column_prefixes = None,
-        model_class_id = 'random_forest_regression',
         n_processes: Optional[int] = None,
         processing_start_time: Optional[float] = None,
         ) -> BacktestResult:
-    '''
-    Run backtesting with feature column filtering and optional multiprocessing.
-    
-    Returns a BacktestResult object containing:
-    - trade_stats: Comprehensive trading performance metrics
-    - validation_df: Combined validation DataFrame with predictions
-    - model configuration and validation parameters
-    - time ranges and processing metadata
-    
-    Processing behavior:
-    - Sequential preprocessing: Overlap handling is done sequentially to maintain chronological order
-    - Parallel training: Model training happens in parallel using multiprocessing (if enabled)
-    - Sequential evaluation: Results are combined maintaining proper model numbering
-    '''
     if processing_start_time is None:
         processing_start_time = time.time()
     
-    # Create validation parameters object
-    validation_params = EventBasedValidationParams(
-        purge_params=purge_params,
-        embargo_period=embargo_period,
-        window_type=window_type,
-        initial_training_fixed_window_size=initial_training_fixed_window_size,
-        step_event_size=step_event_size,
-        validation_fixed_event_size=validation_fixed_event_size,
-        test_fixed_event_size=test_fixed_event_size,
-    )
-    
     data_sets = ml_trading.machine_learning.validation.create_splits(
         ml_data=ml_data,
-        validation_params=validation_params,
+        validation_params=backtest_config.validation_params,
     )
 
     trade_stats_list = []
@@ -113,15 +75,14 @@ def run_with_feature_column_prefix(
     validaiton_timerange_strs = []
     all_validation_dfs = []
 
-    target_column = target_column or f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}'
-    tpsl_return_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}_return'
-    forward_return_column = f'label_forward_return_{forward_period}'
+    tpsl_return_column = f'label_long_tp{backtest_config.tp_label}_sl{backtest_config.tp_label}_{backtest_config.forward_period}_return'
+    forward_return_column = f'label_forward_return_{backtest_config.forward_period}'
 
     processed_datasets = []
     for i, (train_df, validation_df, test_df) in enumerate(data_sets):
         # Apply feature column filtering if specified
-        if feature_column_prefixes:
-            feature_columns = [c for c in train_df.columns if any(c.startswith(feature_column_prefix) for feature_column_prefix in feature_column_prefixes)]
+        if backtest_config.feature_column_prefixes:
+            feature_columns = [c for c in train_df.columns if any(c.startswith(feature_column_prefix) for feature_column_prefix in backtest_config.feature_column_prefixes)]
             label_columns = [c for c in train_df.columns if 'label' in c]
             train_df = train_df[['symbol'] + feature_columns + label_columns]
             validation_df = validation_df[['symbol'] + feature_columns + label_columns]
@@ -146,9 +107,9 @@ def run_with_feature_column_prefix(
             # Set up worker function for parallel processing
             worker_func = partial(
                 _train_model,
-                target_column=target_column,
+                target_column=backtest_config.target_column,
                 forward_return_column=forward_return_column,
-                model_class_id=model_class_id,
+                model_class_id=backtest_config.model_class_id,
             )
 
             # Train models in parallel
@@ -166,8 +127,8 @@ def run_with_feature_column_prefix(
         # Evaluate the model
         trade_stats, validation_y_df = model.evaluate_model(
             validation_df=validation_df,
-            tp_label=tp_label,
-            target_column=target_column,
+            tp_label=backtest_config.tp_label,
+            target_column=backtest_config.target_column,
             tpsl_return_column=tpsl_return_column,
             forward_return_column=forward_return_column,
             prediction_threshold=0.50
@@ -193,24 +154,16 @@ def run_with_feature_column_prefix(
     trade_stats = get_print_trade_results(
         combined_validation_df, 
         threshold=0.50, 
-        tp_label=tp_label
+        tp_label=backtest_config.tp_label
     )
     
     # Create and return BacktestResult
     backtest_result = BacktestResult.from_backtest_run(
         trade_stats=trade_stats,
         validation_df=combined_validation_df,
-        model_class_id=model_class_id,
-        target_column=target_column or f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}',
-        tp_label=tp_label,
-        forward_period=forward_period,
+        backtest_config=backtest_config,
         train_timeranges=train_timerange_strs,
         validation_timeranges=validaiton_timerange_strs,
-        dataset_mode=dataset_mode,
-        export_mode=export_mode,
-        aggregation_mode=aggregation_mode,
-        validation_params=validation_params,
-        feature_column_prefixes=feature_column_prefixes,
         feature_label_params=[str(seq_params)] if seq_params else [],
         n_processes=n_processes,
         processing_time_seconds=processing_time_seconds,
