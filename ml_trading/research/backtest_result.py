@@ -107,42 +107,47 @@ class BacktestResult:
                 f"{self.duration_days} days, "
                 f"total_return={self.trade_stats.total_return:.4f})")
     
-    def _generate_summary_text(self) -> str:
-        """
-        Generate the formatted summary text.
-        
-        This method creates the comprehensive summary text that can be either
-        printed to console or saved to file, eliminating duplication.
-        """
+    def _generate_header_section(self) -> List[str]:
+        """Generate the header section of the summary."""
         lines = []
-        
-        # Header
         lines.append("=" * 60)
         lines.append("BACKTEST RESULT SUMMARY")
         lines.append("=" * 60)
         lines.append(f"Backtest ID: {self.backtest_id or 'N/A'}")
         lines.append(f"Created: {self.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
-        
-        # Model Configuration
+        return lines
+    
+    def _generate_model_config_section(self) -> List[str]:
+        """Generate the model configuration section."""
+        lines = []
         lines.append("\nMODEL CONFIGURATION:")
         lines.append(f"  Model Class: {self.model_class_id}")
         lines.append(f"  Target Column: {self.target_column}")
         lines.append(f"  TP Label: {self.tp_label}")
         lines.append(f"  Forward Period: {self.forward_period}")
-        
-        # Time Configuration
+        return lines
+    
+    def _generate_time_config_section(self) -> List[str]:
+        """Generate the time configuration section."""
+        lines = []
         lines.append("\nTIME CONFIGURATION:")
         lines.append(f"  Overall Period: {self.overall_start_date.strftime('%Y-%m-%d')} to {self.overall_end_date.strftime('%Y-%m-%d')}")
         lines.append(f"  Duration: {self.duration_days} days")
         lines.append(f"  Number of Models: {self.n_models}")
-        
-        # Dataset Configuration
+        return lines
+    
+    def _generate_dataset_config_section(self) -> List[str]:
+        """Generate the dataset configuration section."""
+        lines = []
         lines.append("\nDATASET CONFIGURATION:")
         lines.append(f"  Dataset Mode: {self.dataset_mode}")
         lines.append(f"  Export Mode: {self.export_mode}")
         lines.append(f"  Aggregation Mode: {self.aggregation_mode}")
-        
-        # Validation Configuration
+        return lines
+    
+    def _generate_validation_config_section(self) -> List[str]:
+        """Generate the validation configuration section."""
+        lines = []
         lines.append("\nVALIDATION CONFIGURATION:")
         lines.append(f"  Method: {self.validation_params.get_validation_method()}")
         lines.append(f"  Window Type: {self.validation_params.window_type}")
@@ -164,13 +169,20 @@ class BacktestResult:
             lines.append(f"  Validation Event Size: {self.validation_params.validation_fixed_event_size}")
             lines.append(f"  Test Event Size: {self.validation_params.test_fixed_event_size}")
         
-        # Processing
+        return lines
+    
+    def _generate_processing_section(self) -> List[str]:
+        """Generate the processing configuration section."""
+        lines = []
         lines.append("\nPROCESSING:")
         lines.append(f"  Processes Used: {self.n_processes or 'Sequential'}")
         if self.processing_time_seconds:
             lines.append(f"  Processing Time: {self.processing_time_seconds:.2f} seconds")
-        
-        # Features (Detailed)
+        return lines
+    
+    def _generate_features_section(self) -> List[str]:
+        """Generate the features section."""
+        lines = []
         lines.append("\nFEATURES:")
         if self.feature_column_prefixes:
             lines.append(f"  Feature Prefixes: {', '.join(self.feature_column_prefixes)}")
@@ -178,8 +190,11 @@ class BacktestResult:
             lines.append(f"  Feature Prefixes: All features used")
         if self.feature_label_params:
             lines.append(f"  Feature Label Parameters: {self.feature_label_params}")
-        
-        # Trade Statistics (Detailed)
+        return lines
+    
+    def _generate_trade_stats_section(self) -> List[str]:
+        """Generate the trade statistics section."""
+        lines = []
         lines.append("\nTRADE STATISTICS:")
         lines.append(f"  Total Trades: {self.trade_stats.total_trades:,}")
         lines.append(f"  Win Rate: {self.trade_stats.win_rate:.2%}")
@@ -193,15 +208,21 @@ class BacktestResult:
             lines.append(f"  Positive Win Rate: {self.trade_stats.positive_win_rate:.2%}")
         if hasattr(self.trade_stats, 'negative_win_rate'):
             lines.append(f"  Negative Win Rate: {self.trade_stats.negative_win_rate:.2%}")
-        
-        # Validation Data Summary
+        return lines
+    
+    def _generate_validation_data_section(self) -> List[str]:
+        """Generate the validation data summary section."""
+        lines = []
         lines.append("\nVALIDATION DATA:")
         lines.append(f"  Total Rows: {len(self.validation_df):,}")
         if not self.validation_df.empty:
             lines.append(f"  Unique Symbols: {self.validation_df.index.get_level_values('symbol').nunique():,}")
             lines.append(f"  Unique Timestamps: {self.validation_df.index.get_level_values('timestamp').nunique():,}")
-        
-        # Detailed Time Ranges  
+        return lines
+    
+    def _generate_time_ranges_section(self) -> List[str]:
+        """Generate the detailed time ranges section."""
+        lines = []
         lines.append("\nTIME RANGES:")
         lines.append("  Training Periods:")
         for i, timerange in enumerate(self.train_timeranges, 1):
@@ -209,22 +230,54 @@ class BacktestResult:
         lines.append("  Validation Periods:")
         for i, timerange in enumerate(self.validation_timeranges, 1):
             lines.append(f"    {i}. {timerange}")
-        
-        # Detailed Validation Parameters
+        return lines
+    
+    def _generate_detailed_validation_params_section(self) -> List[str]:
+        """Generate the detailed validation parameters section."""
+        lines = []
         lines.append("\nDETAILED VALIDATION PARAMETERS:")
         val_dict = self.validation_params.to_dict()
         for key, value in val_dict.items():
             lines.append(f"  {key}: {value}")
-        
-        # Notes
+        return lines
+    
+    def _generate_notes_section(self) -> List[str]:
+        """Generate the notes section if notes exist."""
+        lines = []
         if self.notes:
             lines.append("\nNOTES:")
             lines.append(f"  {self.notes}")
+        return lines
+    
+    def _generate_footer_section(self) -> List[str]:
+        """Generate the footer section."""
+        return ["=" * 60]
+    
+    def _generate_summary_text(self) -> str:
+        """
+        Generate the formatted summary text.
         
-        # Footer
-        lines.append("=" * 60)
+        This method creates the comprehensive summary text that can be either
+        printed to console or saved to file, eliminating duplication.
+        """
+        all_lines = []
         
-        return "\n".join(lines)
+        # Generate all sections using helper methods
+        all_lines.extend(self._generate_header_section())
+        all_lines.extend(self._generate_model_config_section())
+        all_lines.extend(self._generate_time_config_section())
+        all_lines.extend(self._generate_dataset_config_section())
+        all_lines.extend(self._generate_validation_config_section())
+        all_lines.extend(self._generate_processing_section())
+        all_lines.extend(self._generate_features_section())
+        all_lines.extend(self._generate_trade_stats_section())
+        all_lines.extend(self._generate_validation_data_section())
+        all_lines.extend(self._generate_time_ranges_section())
+        all_lines.extend(self._generate_detailed_validation_params_section())
+        all_lines.extend(self._generate_notes_section())
+        all_lines.extend(self._generate_footer_section())
+        
+        return "\n".join(all_lines)
     
     def print_summary(self):
         """
