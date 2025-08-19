@@ -10,7 +10,6 @@ from market_data.feature.param import SequentialFeatureParam
 
 import ml_trading.machine_learning.validation
 import ml_trading.models.registry
-from ml_trading.machine_learning.validation_params import PurgeParams, EventBasedValidationParams
 from ml_trading.research.backtest_result import BacktestResult
 from ml_trading.research.backtest_config import BacktestConfig
 from ml_trading.research.trade_stats import get_and_print_trade_stats

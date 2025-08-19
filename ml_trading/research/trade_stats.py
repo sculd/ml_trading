@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, Union, Tuple
+from typing import Dict, Any, Optional
 from sklearn.metrics import r2_score
 
+# Configuration constants
 _max_active_positions = 5
+NEUTRAL_LABEL_BOUNDARY = 1.0  # Boundary for label values: 1 is long, -1 is short, 0 is neutral/draw
 
 
 @dataclass
@@ -74,6 +76,7 @@ def _get_trade_returns(
         max_active_positions: Maximum positions per 5-minute window
         random_state: Random state for reproducibility when selecting positions (None for random)
     """
+    # keep the original df intact.
     result_df = result_df.copy().sort_index(level='timestamp')
     
     # Step 1: Create raw signals on full dataframe
@@ -125,9 +128,9 @@ def _get_trade_returns(
         result_df['pred_decision'] * result_df['tpsl_return'], 
         result_df['trade_return']
     )
-    # For draw cases (y == 0), use forward_return; otherwise use y
+    # For neutral/draw cases (y == 0), use forward_return; otherwise use y
     result_df['trade_return'] = np.where(
-        active_trades_mask & (result_df['y'].abs() < 1.0), 
+        active_trades_mask & (result_df['y'].abs() < NEUTRAL_LABEL_BOUNDARY), 
         result_df['pred_decision'] * result_df['forward_return'], 
         result_df['trade_return']
     )
@@ -245,10 +248,10 @@ class TradeStats:
         masks['short_trades'] = trade_result_df['pred_decision'] < 0
         masks['neutral_trades'] = trade_result_df['pred_decision'] == 0
         
-        # Actual outcome masks
-        masks['positive_actual'] = trade_result_df['y'] >= 1.0
-        masks['negative_actual'] = trade_result_df['y'] <= -1.0
-        masks['neutral_actual'] = trade_result_df['y'].abs() < 1.0
+        # Actual outcome masks (based on discrete label values: 1=long, -1=short, 0=neutral)
+        masks['positive_actual'] = trade_result_df['y'] >= NEUTRAL_LABEL_BOUNDARY
+        masks['negative_actual'] = trade_result_df['y'] <= -NEUTRAL_LABEL_BOUNDARY
+        masks['neutral_actual'] = trade_result_df['y'].abs() < NEUTRAL_LABEL_BOUNDARY
         
         # Win/loss masks
         masks['win_long'] = masks['long_trades'] & masks['positive_actual']
