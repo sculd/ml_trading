@@ -1,6 +1,6 @@
 import datetime
 import dataclasses
-from typing import List
+from typing import List, Optional
 
 from market_data.ingest.common import CacheContext
 
@@ -18,6 +18,7 @@ class BacktestConfig:
     target_column: str
     feature_column_prefixes: List[str] = dataclasses.field(default_factory=list)
     model_class_id: str = 'random_forest_regression'
+    random_state: Optional[int] = None  # Random state for reproducibility in position selection
 
 
 

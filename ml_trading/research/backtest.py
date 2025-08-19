@@ -154,7 +154,8 @@ def run_with_feature_column_prefix(
     trade_stats = get_print_trade_results(
         combined_validation_df, 
         threshold=0.50, 
-        tp_label=backtest_config.tp_label
+        tp_label=backtest_config.tp_label,
+        random_state=backtest_config.random_state
     )
     
     # Create and return BacktestResult

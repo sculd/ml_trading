@@ -53,7 +53,7 @@ class RegressionMetrics:
     r2_trades: float
 
 
-def _get_trade_returns(result_df, threshold=0.70, max_active_positions=_max_active_positions):
+def _get_trade_returns(result_df, threshold=0.70, max_active_positions=_max_active_positions, random_state=None):
     """
     Add pred_decision and trade_return columns with position limits.
     Optimized: work only on trading signals subset for speed.
@@ -67,6 +67,7 @@ def _get_trade_returns(result_df, threshold=0.70, max_active_positions=_max_acti
     Args:
         threshold: Threshold for determining trade decisions
         max_active_positions: Maximum positions per 5-minute window
+        random_state: Random state for reproducibility when selecting positions (None for random)
     """
     result_df = result_df.copy().sort_index(level='timestamp')
     
@@ -95,7 +96,7 @@ def _get_trade_returns(result_df, threshold=0.70, max_active_positions=_max_acti
                 group['pred_decision'] = group['pred_decision_raw']
             else:
                 # Randomly select N signals from this group
-                selected_indices = group.sample(n=max_active_positions, random_state=None).index
+                selected_indices = group.sample(n=max_active_positions, random_state=random_state).index
                 group['pred_decision'] = 0
                 group.loc[selected_indices, 'pred_decision'] = group.loc[selected_indices, 'pred_decision_raw']
             
@@ -335,17 +336,32 @@ class TradeStats:
     
     @staticmethod
     def _calculate_regression_metrics(trade_result_df: pd.DataFrame, masks: Dict[str, pd.Series]) -> RegressionMetrics:
-        """Calculate regression performance metrics."""
+        """Calculate regression performance metrics with proper edge case handling."""
+        # Calculate MAE and MSE
         mae = np.mean(np.abs(trade_result_df['y'] - trade_result_df['pred']))
         mse = np.mean((trade_result_df['y'] - trade_result_df['pred']) ** 2)
-        r2 = r2_score(trade_result_df['y'], trade_result_df['pred'])
+        
+        # Calculate R² with variance check
+        y_variance = np.var(trade_result_df['y'])
+        if len(trade_result_df) > 1 and y_variance > 1e-10:  # Need variance for meaningful R²
+            r2 = r2_score(trade_result_df['y'], trade_result_df['pred'])
+        else:
+            # If no variance in y (all same value) or not enough samples, R² is undefined
+            # Use 0.0 for consistency, but could also use np.nan
+            r2 = 0.0
         
         # Calculate R² for trading decisions only (non-neutral predictions)
         active_trade_result_df = trade_result_df[masks['active_trades']]
-        if len(active_trade_result_df) > 1:  # Need at least 2 points for R²
-            r2_trades = r2_score(active_trade_result_df['y'], active_trade_result_df['pred'])
+        if len(active_trade_result_df) > 1:
+            y_trades_variance = np.var(active_trade_result_df['y'])
+            if y_trades_variance > 1e-10:  # Check for variance
+                r2_trades = r2_score(active_trade_result_df['y'], active_trade_result_df['pred'])
+            else:
+                # No variance in active trades (all same outcome)
+                r2_trades = 0.0
         else:
-            r2_trades = 0.0  # Default if not enough trading decisions
+            # Not enough trading decisions for R²
+            r2_trades = 0.0
         
         return RegressionMetrics(
             mae=mae,
@@ -355,7 +371,7 @@ class TradeStats:
         )
     
     @staticmethod
-    def from_result_df(result_df, threshold, tp_label):
+    def from_result_df(result_df, threshold, tp_label, random_state=None):
         '''
         Create TradeStats from trade result dataframe.
         
@@ -367,9 +383,10 @@ class TradeStats:
         - trade_return  
 
         tp_label is like "30", "50" (3% and 5%)
+        random_state: Random state for reproducibility when selecting positions (None for random)
         '''
         # Add pred_decision and trade_return columns
-        trade_result_df = _get_trade_returns(result_df, threshold=threshold)
+        trade_result_df = _get_trade_returns(result_df, threshold=threshold, random_state=random_state)
         
         # Calculate all masks
         masks = TradeStats._calculate_masks(trade_result_df)
@@ -473,7 +490,7 @@ class TradeStats:
         print(self)
 
 
-def get_print_trade_results(result_df, threshold, tp_label):
+def get_print_trade_results(result_df, threshold, tp_label, random_state=None):
     '''
     result_df is expected to have these columns:
     - y
@@ -482,9 +499,10 @@ def get_print_trade_results(result_df, threshold, tp_label):
     - forward_return
 
     Note that the result does not have timestamp and symbol at all.
+    random_state: Random state for reproducibility when selecting positions (None for random)
     '''
     # Calculate stats for full period
-    trade_stats = TradeStats.from_result_df(result_df, threshold, tp_label)
+    trade_stats = TradeStats.from_result_df(result_df, threshold, tp_label, random_state=random_state)
     
     first_date = result_df.index.get_level_values('timestamp').min()
     last_date = result_df.index.get_level_values('timestamp').max()
