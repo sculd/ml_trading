@@ -63,10 +63,10 @@ combined_validation_df = ml_trading.research.backtest.run_with_feature_column_pr
 )
 
 
-trade_results = ml_trading.research.backtest.get_print_trade_results(combined_validation_df, threshold=0.8, tp_label=tp_label)
+trade_results = ml_trading.research.backtest.get_and_print_trade_stats(combined_validation_df, threshold=0.8, tp_label=tp_label)
 print(trade_results)
 
-trade_results = ml_trading.research.backtest.get_print_trade_results(combined_validation_df, threshold=0.5, tp_label=tp_label)
+trade_results = ml_trading.research.backtest.get_and_print_trade_stats(combined_validation_df, threshold=0.5, tp_label=tp_label)
 print(trade_results)
 #'''
 
@@ -75,10 +75,10 @@ combined_validation_df = run_with_feature_column_prefix()
 # ['rsi', 'open_close_ratio', 'hl_range_pct', 'ffd_zscore_close', 'ffd_volatility_zscore']
 # 'rsi', 'open_close_ratio', 'ffd_zscore_close', 'ffd_volatility_zscore'
 
-trade_results = get_print_trade_results(combined_validation_df, threshold=0.7)
+trade_results = get_and_print_trade_stats(combined_validation_df, threshold=0.7)
 print(trade_results)
 
-trade_results = get_print_trade_results(combined_validation_df, threshold=0.5)
+trade_results = get_and_print_trade_stats(combined_validation_df, threshold=0.5)
 print(trade_results)
 #'''
 

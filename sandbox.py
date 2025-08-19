@@ -85,14 +85,14 @@ if __name__ == '__main__':
     last_month_df = backtest_result.validation_df[backtest_result.validation_df.index.get_level_values('timestamp') >= one_month_ago]
 
     print("\nFull period")
-    trade_results = ml_trading.research.trade_stats.get_print_trade_results(backtest_result.validation_df, threshold=0.8, tp_label=tp_label)
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(backtest_result.validation_df, threshold=0.8, tp_label=tp_label)
     print("\nLast month")
-    trade_results = ml_trading.research.trade_stats.get_print_trade_results(last_month_df, threshold=0.8, tp_label=tp_label)
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(last_month_df, threshold=0.8, tp_label=tp_label)
 
     print("\nFull period")
-    trade_results = ml_trading.research.trade_stats.get_print_trade_results(backtest_result.validation_df, threshold=0.5, tp_label=tp_label)
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(backtest_result.validation_df, threshold=0.5, tp_label=tp_label)
     print("\nLast month")
-    trade_results = ml_trading.research.trade_stats.get_print_trade_results(last_month_df, threshold=0.5, tp_label=tp_label)
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(last_month_df, threshold=0.5, tp_label=tp_label)
     #'''
 
 
@@ -137,11 +137,11 @@ if __name__ == '__main__':
     for feature_column_prefix in feature_column_prefixes:
         combined_validation_df = validation_dfs[feature_column_prefix]
         print(f"\n{feature_column_prefix=}")
-        trade_results = get_print_trade_results(combined_validation_df, threshold=0.8)
+        trade_results = get_and_print_trade_stats(combined_validation_df, threshold=0.8)
         trade_results['feature_column_prefix'] = feature_column_prefix
         trade_results_list.append(trade_results)
 
-        trade_results = get_print_trade_results(combined_validation_df, threshold=0.5)
+        trade_results = get_and_print_trade_stats(combined_validation_df, threshold=0.5)
         trade_results['feature_column_prefix'] = feature_column_prefix
         trade_results_list.append(trade_results)
 
@@ -162,11 +162,11 @@ if __name__ == '__main__':
         label = ','.join(prefixes)
         combined_validation_df = validation_dfs[label]
         print(f"\n{label=}")
-        trade_results = get_print_trade_results(combined_validation_df, threshold=0.8)
+        trade_results = get_and_print_trade_stats(combined_validation_df, threshold=0.8)
         trade_results['feature_column_prefix'] = label
         trade_results_with_couple_features_list.append(trade_results)
 
-        trade_results = get_print_trade_results(combined_validation_df, threshold=0.5)
+        trade_results = get_and_print_trade_stats(combined_validation_df, threshold=0.5)
         trade_results['feature_column_prefix'] = label
         trade_results_with_couple_features_list.append(trade_results)
 

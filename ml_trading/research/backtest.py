@@ -13,7 +13,7 @@ import ml_trading.models.registry
 from ml_trading.machine_learning.validation_params import PurgeParams, EventBasedValidationParams
 from ml_trading.research.backtest_result import BacktestResult
 from ml_trading.research.backtest_config import BacktestConfig
-from ml_trading.research.trade_stats import get_print_trade_results
+from ml_trading.research.trade_stats import get_and_print_trade_stats
 
 import logging
 logger = logging.getLogger(__name__)
@@ -151,7 +151,7 @@ def run_with_feature_column_prefix(
     processing_time_seconds = time.time() - processing_start_time
     
     # Calculate trade statistics from the combined validation data
-    trade_stats = get_print_trade_results(
+    trade_stats = get_and_print_trade_stats(
         combined_validation_df, 
         threshold=0.50, 
         tp_label=backtest_config.tp_label,

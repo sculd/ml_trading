@@ -51,10 +51,10 @@ combined_validation_df = ml_trading.research.backtest.run_with_feature_column_pr
     ml_data=ml_data,
 )
 
-trade_results = ml_trading.research.backtest.get_print_trade_results(combined_validation_df, threshold=0.8, tp_label=tp_label)
+trade_results = ml_trading.research.backtest.get_and_print_trade_stats(combined_validation_df, threshold=0.8, tp_label=tp_label)
 print(trade_results)
 
-trade_results = ml_trading.research.backtest.get_print_trade_results(combined_validation_df, threshold=0.5, tp_label=tp_label)
+trade_results = ml_trading.research.backtest.get_and_print_trade_stats(combined_validation_df, threshold=0.5, tp_label=tp_label)
 print(trade_results)
 #'''
 

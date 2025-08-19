@@ -385,4 +385,4 @@ def evaluate_lstm_model(
     validation_y_df['forward_return'] = forward_return_test
     validation_y_df = validation_y_df.sort_index().reset_index().set_index(['timestamp', 'symbol'])
 
-    return ml_trading.research.trade_stats.get_print_trade_results(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df
+    return ml_trading.research.trade_stats.get_and_print_trade_stats(validation_y_df, threshold=prediction_threshold, tp_label=tp_label), validation_y_df

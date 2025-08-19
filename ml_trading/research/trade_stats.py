@@ -500,7 +500,7 @@ class TradeStats:
         print(self)
 
 
-def get_print_trade_results(
+def get_and_print_trade_stats(
     result_df: pd.DataFrame, 
     threshold: float, 
     tp_label: str, 
