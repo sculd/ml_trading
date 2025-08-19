@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Union, Tuple
 from sklearn.metrics import r2_score
 
 _max_active_positions = 5
@@ -53,7 +53,12 @@ class RegressionMetrics:
     r2_trades: float
 
 
-def _get_trade_returns(result_df, threshold=0.70, max_active_positions=_max_active_positions, random_state=None):
+def _get_trade_returns(
+    result_df: pd.DataFrame, 
+    threshold: float = 0.70, 
+    max_active_positions: int = _max_active_positions, 
+    random_state: Optional[int] = None
+) -> pd.DataFrame:
     """
     Add pred_decision and trade_return columns with position limits.
     Optimized: work only on trading signals subset for speed.
@@ -90,7 +95,7 @@ def _get_trade_returns(result_df, threshold=0.70, max_active_positions=_max_acti
         signals_df['timestamp_5min'] = signals_df['timestamp'].dt.floor('5min')
         
         # Step 4: Apply position limits only to signals subset
-        def limit_positions_per_5min_window(group):
+        def limit_positions_per_5min_window(group: pd.DataFrame) -> pd.DataFrame:
             if len(group) <= max_active_positions:
                 # All signals can be taken
                 group['pred_decision'] = group['pred_decision_raw']
@@ -371,7 +376,12 @@ class TradeStats:
         )
     
     @staticmethod
-    def from_result_df(result_df, threshold, tp_label, random_state=None):
+    def from_result_df(
+        result_df: pd.DataFrame, 
+        threshold: float, 
+        tp_label: str, 
+        random_state: Optional[int] = None
+    ) -> 'TradeStats':
         '''
         Create TradeStats from trade result dataframe.
         
@@ -406,8 +416,8 @@ class TradeStats:
             regression_metrics=regression_metrics
         )
     
-    def __str__(self):
-        result = ""
+    def __str__(self) -> str:
+        result: str = ""
         result += f"MAE: {self.mae:.4f}, MSE: {self.mse:.4f}, R²(all): {self.r2:.4f}, R²(trades): {self.r2_trades:.4f}"
         result += f"\nTotal trades: {self.total_trades}"
         result += f"\nAverage return per trade: {self.avg_return:.4f}"
@@ -482,7 +492,7 @@ class TradeStats:
             }
         }
     
-    def print_stats(self, threshold: float, date_range: str = ""):
+    def print_stats(self, threshold: float, date_range: str = "") -> None:
         """Print formatted trading statistics"""
         print(f"\nTrade statistics (threshold={threshold}):")
         if date_range:
@@ -490,7 +500,12 @@ class TradeStats:
         print(self)
 
 
-def get_print_trade_results(result_df, threshold, tp_label, random_state=None):
+def get_print_trade_results(
+    result_df: pd.DataFrame, 
+    threshold: float, 
+    tp_label: str, 
+    random_state: Optional[int] = None
+) -> TradeStats:
     '''
     result_df is expected to have these columns:
     - y
