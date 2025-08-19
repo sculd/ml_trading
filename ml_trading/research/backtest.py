@@ -89,7 +89,7 @@ def run_with_feature_column_prefix(
                 test_df = test_df[['symbol'] + feature_columns + label_columns]
         processed_datasets.append((train_df, validation_df, test_df))
 
-    processed_datasets = processed_datasets = ml_trading.machine_learning.validation.dedupe_validation_test_data(processed_datasets)
+    processed_datasets = ml_trading.machine_learning.validation.dedupe_validation_test_data(processed_datasets)
     
     # Determine processing method and train models
     results = None
@@ -154,7 +154,8 @@ def run_with_feature_column_prefix(
         combined_validation_df, 
         threshold=0.50, 
         tp_label=backtest_config.tp_label,
-        random_state=backtest_config.random_state
+        random_state=backtest_config.random_state,
+        max_active_positions=backtest_config.max_active_positions
     )
     
     # Create and return BacktestResult

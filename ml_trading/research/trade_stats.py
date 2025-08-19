@@ -5,7 +5,6 @@ from typing import Dict, Any, Optional
 from sklearn.metrics import r2_score
 
 # Configuration constants
-_max_active_positions = 5
 NEUTRAL_LABEL_BOUNDARY = 1.0  # Boundary for label values: 1 is long, -1 is short, 0 is neutral/draw
 
 
@@ -58,7 +57,7 @@ class RegressionMetrics:
 def _get_trade_returns(
     result_df: pd.DataFrame, 
     threshold: float = 0.70, 
-    max_active_positions: int = _max_active_positions, 
+    max_active_positions: int = 5, 
     random_state: Optional[int] = None
 ) -> pd.DataFrame:
     """
@@ -383,7 +382,8 @@ class TradeStats:
         result_df: pd.DataFrame, 
         threshold: float, 
         tp_label: str, 
-        random_state: Optional[int] = None
+        random_state: Optional[int] = None,
+        max_active_positions: int = 5
     ) -> 'TradeStats':
         '''
         Create TradeStats from trade result dataframe.
@@ -397,9 +397,15 @@ class TradeStats:
 
         tp_label is like "30", "50" (3% and 5%)
         random_state: Random state for reproducibility when selecting positions (None for random)
+        max_active_positions: Maximum positions per 5-minute window
         '''
         # Add pred_decision and trade_return columns
-        trade_result_df = _get_trade_returns(result_df, threshold=threshold, random_state=random_state)
+        trade_result_df = _get_trade_returns(
+            result_df, 
+            threshold=threshold, 
+            random_state=random_state,
+            max_active_positions=max_active_positions
+        )
         
         # Calculate all masks
         masks = TradeStats._calculate_masks(trade_result_df)
@@ -507,7 +513,8 @@ def get_and_print_trade_stats(
     result_df: pd.DataFrame, 
     threshold: float, 
     tp_label: str, 
-    random_state: Optional[int] = None
+    random_state: Optional[int] = None,
+    max_active_positions: int = 5
 ) -> TradeStats:
     '''
     result_df is expected to have these columns:
@@ -518,9 +525,16 @@ def get_and_print_trade_stats(
 
     Note that the result does not have timestamp and symbol at all.
     random_state: Random state for reproducibility when selecting positions (None for random)
+    max_active_positions: Maximum positions per 5-minute window
     '''
     # Calculate stats for full period
-    trade_stats = TradeStats.from_result_df(result_df, threshold, tp_label, random_state=random_state)
+    trade_stats = TradeStats.from_result_df(
+        result_df, 
+        threshold, 
+        tp_label, 
+        random_state=random_state,
+        max_active_positions=max_active_positions
+    )
     
     first_date = result_df.index.get_level_values('timestamp').min()
     last_date = result_df.index.get_level_values('timestamp').max()
