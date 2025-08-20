@@ -1,6 +1,4 @@
 import torch
-import platform
-import sys
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -25,16 +23,8 @@ def into_X_y(
     scaler: Optional[StandardScaler] = None,
     use_scaler: bool = False,
 ) -> Tuple[pd.Series, pd.Series, pd.Series, StandardScaler]:
-    """Process data for HMM model assuming data is already sequentialized.
+    """Process data.
     
-    Args:
-        df: DataFrame with features and target
-        target_column: Name of the target column
-        tpsl_return_column: Name of the tpsl return column
-        forward_return_column: Name of the forward return column
-        scaler: Optional scaler for features
-        use_scaler: Whether to scale the features
-        
     Returns:
         X: Feature matrix 
         y: Target values
@@ -44,12 +34,15 @@ def into_X_y(
     # Extract target
 
     df = df.drop('symbol', axis=1)
-    
-    # Drop all label_ columns except the target column to prevent look-ahead bias
-    used_labels = [target_column, tpsl_return_column, forward_return_column]
+
+    forward_return = df[forward_return_column] if forward_return_column else None
+    tpsl_return = df[tpsl_return_column] if tpsl_return_column else None
+
+    # here label means potential target
+    used_labels = [target_column]
     used_labels = [c for c in used_labels if c is not None]
-    label_columns = [col for col in df.columns if col.startswith('label_') and col not in used_labels]
-    df = df.drop(label_columns, axis=1)
+    label_columns_to_drop = [col for col in df.columns if col.startswith('label_') and col not in used_labels]
+    df = df.drop(label_columns_to_drop, axis=1)
     for col in ["open", "high", "low", "close", "volume"]:
         assert col not in df.columns    
 
@@ -67,7 +60,4 @@ def into_X_y(
         else:
             X = scaler.transform(X)
     
-    forward_return = df[forward_return_column] if forward_return_column else None
-    tpsl_return = df[tpsl_return_column] if tpsl_return_column else None
-
     return X, y, tpsl_return, forward_return, scaler

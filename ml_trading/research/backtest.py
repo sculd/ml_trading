@@ -35,14 +35,6 @@ def _train_model(
     logger.info(f'train: {len(train_df)}, {train_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {train_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')
     logger.info(f'validation: {len(validation_df)}, {validation_df.head(1).index[0].strftime("%Y-%m-%d %H:%M:%S")} - {validation_df.tail(1).index[0].strftime("%Y-%m-%d %H:%M:%S")}')
 
-    # Report data sizes before and after dropna
-    size_train_df = len(train_df)
-    size_validation_df = len(validation_df)
-    train_df = train_df.dropna(subset=[target_column, forward_return_column])
-    validation_df = validation_df.dropna(subset=[target_column, forward_return_column])
-    logger.info(f"train_df size: {size_train_df} -> {len(train_df)}")
-    logger.info(f"validation_df size: {size_validation_df} -> {len(validation_df)}")
-    
     # Train the model
     model = train_func(train_df=train_df, target_column=target_column)
 
@@ -64,6 +56,9 @@ def run_with_feature_column_prefix(
     if processing_start_time is None:
         processing_start_time = time.time()
     
+    tpsl_return_column = f'label_long_tp{backtest_config.tp_label}_sl{backtest_config.tp_label}_{backtest_config.forward_period}_return'
+    forward_return_column = f'label_forward_return_{backtest_config.forward_period}'
+    ml_data = ml_data.dropna(subset=[backtest_config.target_column, forward_return_column])
     data_sets = ml_trading.machine_learning.validation.create_splits(
         ml_data=ml_data,
         validation_params=backtest_config.validation_params,
@@ -73,9 +68,6 @@ def run_with_feature_column_prefix(
     train_timerange_strs = []
     validaiton_timerange_strs = []
     all_validation_dfs = []
-
-    tpsl_return_column = f'label_long_tp{backtest_config.tp_label}_sl{backtest_config.tp_label}_{backtest_config.forward_period}_return'
-    forward_return_column = f'label_forward_return_{backtest_config.forward_period}'
 
     processed_datasets = []
     for i, (train_df, validation_df, test_df) in enumerate(data_sets):
@@ -87,14 +79,6 @@ def run_with_feature_column_prefix(
             validation_df = validation_df[['symbol'] + feature_columns + label_columns]
             if len(test_df) > 0:
                 test_df = test_df[['symbol'] + feature_columns + label_columns]
-
-        else:
-            labels_to_keep = [backtest_config.target_column, tpsl_return_column, forward_return_column]
-            label_columns_to_drop = [c for c in train_df.columns if 'label' in c and c not in labels_to_keep]
-            train_df = train_df.drop(columns=label_columns_to_drop)
-            validation_df = validation_df.drop(columns=label_columns_to_drop)
-            if len(test_df) > 0:
-                test_df = test_df.drop(columns=label_columns_to_drop)
 
         processed_datasets.append((train_df, validation_df, test_df))
 
