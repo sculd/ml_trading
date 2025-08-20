@@ -34,9 +34,6 @@ def create_splits(
     Returns:
         List of tuples containing (train_df, validation_df, test_df)
     """
-    # Import split methods to ensure they are registered
-    import ml_trading.machine_learning.validation.split_methods
-    
     # Determine method name if not provided
     if method is None:
         if isinstance(validation_params, EventBasedValidationParams):

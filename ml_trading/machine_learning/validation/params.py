@@ -86,6 +86,19 @@ class RatioBasedValidationParams(ValidationParams):
             ** super().to_dict(),
         }
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "RatioBasedValidationParams":
+        assert data.get('validation_method') == 'ratio_based'
+        return cls(
+            split_ratio=data['split_ratio'],
+            fixed_window_size=datetime.timedelta(days=data['fixed_window_size_days']),
+            step_size=datetime.timedelta(days=data['step_size_days']),
+            purge_params=PurgeParams(
+                purge_period=datetime.timedelta(days=data['purge_period_days'])
+            ),
+            embargo_period=datetime.timedelta(days=data['embargo_period_days']),
+            window_type=data['window_type']
+        )
 
 @dataclass
 class EventBasedValidationParams(ValidationParams):
@@ -125,35 +138,10 @@ class EventBasedValidationParams(ValidationParams):
             ** super().to_dict(),
         }
 
-
-# Type alias for all validation parameter types
-ValidationParamsType = Union[RatioBasedValidationParams, EventBasedValidationParams]
-
-def params_from_dict(data: dict) -> ValidationParamsType:
-    """
-    Factory function to create validation parameters from dictionary.
-    
-    Args:
-        data: Dictionary containing validation parameters
-        
-    Returns:
-        ValidationParams instance of the appropriate type
-    """
-    method = data.get('validation_method')
-    
-    if method == 'ratio_based':
-        return RatioBasedValidationParams(
-            split_ratio=data['split_ratio'],
-            fixed_window_size=datetime.timedelta(days=data['fixed_window_size_days']),
-            step_size=datetime.timedelta(days=data['step_size_days']),
-            purge_params=PurgeParams(
-                purge_period=datetime.timedelta(days=data['purge_period_days'])
-            ),
-            embargo_period=datetime.timedelta(days=data['embargo_period_days']),
-            window_type=data['window_type']
-        )
-    elif method == 'event_based':
-        return EventBasedValidationParams(
+    @classmethod
+    def from_dict(cls, data: dict) -> "EventBasedValidationParams":
+        assert data.get('validation_method') == 'event_based'
+        return cls(
             initial_training_fixed_window_size=datetime.timedelta(days=data['initial_training_window_days']),
             step_event_size=data['step_event_size'],
             validation_fixed_event_size=data['validation_fixed_event_size'],
@@ -164,5 +152,7 @@ def params_from_dict(data: dict) -> ValidationParamsType:
             embargo_period=datetime.timedelta(days=data['embargo_period_days']),
             window_type=data['window_type']
         )
-    else:
-        raise ValueError(f"Unknown validation method: {method}")
+
+
+# Type alias for all validation parameter types
+ValidationParamsType = Union[RatioBasedValidationParams, EventBasedValidationParams]
