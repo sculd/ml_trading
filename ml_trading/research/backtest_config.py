@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from market_data.ingest.common import CacheContext
 
-from ml_trading.machine_learning.validation_params import ValidationParamsType
+from ml_trading.machine_learning.validation.params import ValidationParamsType
 
 
 

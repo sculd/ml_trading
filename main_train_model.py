@@ -10,7 +10,7 @@ import market_data.feature.registry
 
 import market_data.machine_learning.cache_ml_data
 import ml_trading.models.manager
-import ml_trading.machine_learning.validation
+import ml_trading.machine_learning.validation.validation
 import ml_trading.models.non_sequential.xgboost_regression
 import ml_trading.models.non_sequential.mlp_deep_model
 from ml_trading.machine_learning.train import TrainingParams, train_model

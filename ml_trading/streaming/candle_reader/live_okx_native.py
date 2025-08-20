@@ -11,7 +11,7 @@ import time
 import pytz
 from dataclasses import dataclass
 import market_data.machine_learning.resample as resample
-import ml_trading.machine_learning.validation as validation
+import ml_trading.machine_learning.validation.validation as validation
 import ml_trading.streaming.candle_processor.ml_trading
 import ml_trading.streaming.live_trading.trade_execution.execution_okx
 import ml_trading.streaming.live_trading.util.symbols_okx

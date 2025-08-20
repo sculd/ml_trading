@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import market_data.machine_learning.resample as resample
-import ml_trading.machine_learning.validation as validation
+import ml_trading.machine_learning.validation.validation as validation
 import ml_trading.streaming.candle_processor.base as base
 import logging
 

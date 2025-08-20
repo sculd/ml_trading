@@ -12,7 +12,7 @@ import market_data.util.time
 import market_data.machine_learning.resample
 from market_data.feature.impl.common import SequentialFeatureParam
 
-import ml_trading.machine_learning.validation_data
+import ml_trading.machine_learning.validation.validation
 import ml_trading.models.non_sequential.xgboost_regression
 import ml_trading.models.non_sequential.mlp_deep_model
 import ml_trading.models.non_sequential.lightgbm_regression
@@ -36,7 +36,7 @@ combined_validation_df = ml_trading.research.backtest.run_with_feature_column_pr
     feature_label_params = market_data.feature.registry.list_registered_features('all'),
     time_range=time_range,
     initial_training_fixed_window_size = datetime.timedelta(days=100),
-    purge_params = ml_trading.machine_learning.validation_data.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
+    purge_params = ml_trading.machine_learning.validation.validation.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
     embargo_period = datetime.timedelta(days=1),
     target_params = target_params_batch,
     resample_params = market_data.machine_learning.resample.ResampleParams(price_col = 'close', threshold = 0.1),

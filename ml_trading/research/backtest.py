@@ -8,11 +8,12 @@ from typing import Tuple, Optional, List, Dict, Any, Union
 
 from market_data.feature.param import SequentialFeatureParam
 
-import ml_trading.machine_learning.validation
+import ml_trading.machine_learning.validation.validation
 import ml_trading.models.registry
 from ml_trading.research.backtest_result import BacktestResult
 from ml_trading.research.backtest_config import BacktestConfig
 from ml_trading.research.trade_stats import get_and_print_trade_stats
+from ml_trading.machine_learning.validation.common import combine_validation_dfs, dedupe_validation_test_data
 
 import logging
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ def run_with_feature_column_prefix(
     tpsl_return_column = f'label_long_tp{backtest_config.tp_label}_sl{backtest_config.tp_label}_{backtest_config.forward_period}_return'
     forward_return_column = f'label_forward_return_{backtest_config.forward_period}'
     ml_data = ml_data.dropna(subset=[backtest_config.target_column, forward_return_column])
-    data_sets = ml_trading.machine_learning.validation.create_splits(
+    data_sets = ml_trading.machine_learning.validation.validation.create_splits(
         ml_data=ml_data,
         validation_params=backtest_config.validation_params,
     )
@@ -82,7 +83,7 @@ def run_with_feature_column_prefix(
 
         processed_datasets.append((train_df, validation_df, test_df))
 
-    processed_datasets = ml_trading.machine_learning.validation.dedupe_validation_test_data(processed_datasets)
+    processed_datasets = dedupe_validation_test_data(processed_datasets)
     
     # Determine processing method and train models
     results = None
@@ -137,7 +138,7 @@ def run_with_feature_column_prefix(
               f"negative_win_rate: {trade_stats.negative_win_rate:.2f}"
               )
 
-    combined_validation_df = ml_trading.machine_learning.validation.combine_validation_dfs(all_validation_dfs)
+    combined_validation_df = combine_validation_dfs(all_validation_dfs)
     
     # Calculate processing time
     processing_time_seconds = time.time() - processing_start_time

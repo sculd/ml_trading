@@ -19,10 +19,9 @@ from market_data.feature.param import SequentialFeatureParam
 from market_data.target.param import TargetParamsBatch, TargetParams
 from market_data.machine_learning.resample.calc import CumSumResampleParams
 from ml_trading.research.backtest import BacktestConfig
-from ml_trading.machine_learning.validation_params import ValidationParamsType, EventBasedValidationParams
+from ml_trading.machine_learning.validation.params import ValidationParamsType, EventBasedValidationParams
 
-import ml_trading.models.registry
-import ml_trading.machine_learning.validation
+import ml_trading.machine_learning.validation.validation
 import ml_trading.research.backtest
 import ml_trading.research.trade_stats
 
@@ -51,16 +50,16 @@ if __name__ == '__main__':
     ml_data = load_cached_ml_data(
         CacheContext(DATASET_MODE.OKX, EXPORT_MODE.BY_MINUTE, AGGREGATION_MODE.TAKE_LATEST),
         time_range=time_range,
-        feature_collection = feature_collection,
+        feature_collection = FeatureLabelCollection(),
         target_params_batch=target_params_batch,
         resample_params=CumSumResampleParams(price_col = 'close', threshold = 0.1),
     )
 
     validation_params = EventBasedValidationParams(
-        purge_params = ml_trading.machine_learning.validation.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
+        purge_params = ml_trading.machine_learning.validation.validation.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
         embargo_period = datetime.timedelta(days=0),
         window_type='fixed',
-        initial_training_fixed_window_size = datetime.timedelta(days=100),
+        initial_training_fixed_window_size = datetime.timedelta(days=30),
         step_event_size = 400,
         validation_fixed_event_size = 400,
         test_fixed_event_size= 0,
@@ -92,14 +91,9 @@ if __name__ == '__main__':
     last_month_df = backtest_result.validation_df[backtest_result.validation_df.index.get_level_values('timestamp') >= one_month_ago]
 
     print("\nFull period")
-    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(backtest_result.validation_df, threshold=0.8, tp_label=tp_label)
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(backtest_result.validation_df, threshold=0.1, tp_label=tp_label)
     print("\nLast month")
-    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(last_month_df, threshold=0.8, tp_label=tp_label)
-
-    print("\nFull period")
-    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(backtest_result.validation_df, threshold=0.5, tp_label=tp_label)
-    print("\nLast month")
-    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(last_month_df, threshold=0.5, tp_label=tp_label)
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(last_month_df, threshold=0.1, tp_label=tp_label)
     #'''
 
 

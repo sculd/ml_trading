@@ -6,6 +6,7 @@ import importlib
 import pandas as pd
 import numpy as np
 import market_data.util.time
+from ml_trading.machine_learning.validation.common import combine_validation_dfs
 import ml_trading.research.backtest
 
 # OpenMP threading issue
@@ -160,7 +161,7 @@ def run_with_feature_column_prefix(feature_column_prefixes = None):
     for i, (train_timerange_str, validation_timerange_str, metrics) in enumerate(zip(train_timerange_strs, validaiton_timerange_strs, metrics_list)):
         print(f"{i+1}, train (size: {len(train_df)}): {train_timerange_str}\n" + f"validation (size: {len(validation_y_df)}): {validation_timerange_str}, non_zero_accuracy: {(metrics['non_zero_accuracy'] if 'non_zero_accuracy' in metrics else 0):.2f} (out of {(metrics['non_zero_predictions'] if 'non_zero_predictions' in metrics else 0):.2f})")
 
-    combined_validation_df = ml_trading.research.backtest.combine_validation_dfs(all_validation_dfs)
+    combined_validation_df = combine_validation_dfs(all_validation_dfs)
     return combined_validation_df
 
 

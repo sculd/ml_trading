@@ -6,7 +6,7 @@ import time
 from typing import List, Tuple, Dict, Any, Optional, Union
 import market_data.target.target 
 import market_data.machine_learning.resample as resample
-import ml_trading.machine_learning.validation as validation
+import ml_trading.machine_learning.validation.validation as validation
 import ml_trading.streaming.candle_processor.base as base
 import ml_trading.streaming.candle_processor.cumsum_event as cumsum_event
 import market_data.feature.registry
