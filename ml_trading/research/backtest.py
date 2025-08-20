@@ -87,6 +87,15 @@ def run_with_feature_column_prefix(
             validation_df = validation_df[['symbol'] + feature_columns + label_columns]
             if len(test_df) > 0:
                 test_df = test_df[['symbol'] + feature_columns + label_columns]
+
+        else:
+            labels_to_keep = [backtest_config.target_column, tpsl_return_column, forward_return_column]
+            label_columns_to_drop = [c for c in train_df.columns if 'label' in c and c not in labels_to_keep]
+            train_df = train_df.drop(columns=label_columns_to_drop)
+            validation_df = validation_df.drop(columns=label_columns_to_drop)
+            if len(test_df) > 0:
+                test_df = test_df.drop(columns=label_columns_to_drop)
+
         processed_datasets.append((train_df, validation_df, test_df))
 
     processed_datasets = ml_trading.machine_learning.validation.dedupe_validation_test_data(processed_datasets)

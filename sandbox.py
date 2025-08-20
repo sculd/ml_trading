@@ -18,6 +18,8 @@ from market_data.machine_learning.ml_data.cache import load_cached_ml_data, calc
 from market_data.feature.param import SequentialFeatureParam
 from market_data.target.param import TargetParamsBatch, TargetParams
 from market_data.machine_learning.resample.calc import CumSumResampleParams
+from ml_trading.research.backtest import BacktestConfig
+from ml_trading.machine_learning.validation_params import ValidationParamsType, EventBasedValidationParams
 
 import ml_trading.models.registry
 import ml_trading.machine_learning.validation
@@ -54,24 +56,29 @@ if __name__ == '__main__':
         resample_params=CumSumResampleParams(price_col = 'close', threshold = 0.1),
     )
 
-    backtest_result = ml_trading.research.backtest.run_with_feature_column_prefix(
-        ml_data,
-        market_data.ingest.common.DATASET_MODE.OKX, 
-        market_data.ingest.common.EXPORT_MODE.BY_MINUTE, 
-        market_data.ingest.common.AGGREGATION_MODE.TAKE_LATEST,
-        #feature_label_params = market_data.feature.registry.list_registered_features('all'),
-        initial_training_fixed_window_size = datetime.timedelta(days=100),
+    validation_params = EventBasedValidationParams(
         purge_params = ml_trading.machine_learning.validation.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
         embargo_period = datetime.timedelta(days=0),
-        forward_period = forward_period,
-        tp_label = tp_label,
-        target_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}_score',
+        window_type='fixed',
+        initial_training_fixed_window_size = datetime.timedelta(days=100),
         step_event_size = 400,
         validation_fixed_event_size = 400,
         test_fixed_event_size= 0,
-        window_type='fixed',
+    )
+    
+    backtest_config = BacktestConfig(
+        cache_context = CacheContext(DATASET_MODE.OKX, EXPORT_MODE.BY_MINUTE, AGGREGATION_MODE.TAKE_LATEST),
+        validation_params = validation_params,
+        forward_period = forward_period,
+        tp_label = tp_label,
+        target_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}_score',
         feature_column_prefixes=[],
         model_class_id = 'random_forest_regression',
+    )
+
+    backtest_result = ml_trading.research.backtest.run_with_feature_column_prefix(
+        ml_data,
+        backtest_config,
     )
 
     #combined_validation_df.to_parquet('crypto_result_2024_2025_resample10.parquet')

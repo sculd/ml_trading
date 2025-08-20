@@ -1,4 +1,3 @@
-import datetime
 import dataclasses
 from typing import List, Optional
 
@@ -15,12 +14,10 @@ class BacktestConfig:
     forward_period: str # e.g. "10m"
     tp_label: str # "30" for 3%
     target_column: str
-    embargo_period: datetime.timedelta = datetime.timedelta(days=0)
     feature_column_prefixes: List[str] = dataclasses.field(default_factory=list)
     model_class_id: str = 'random_forest_regression'
     random_state: Optional[int] = None  # Random state for reproducibility in position selection
     max_active_positions: int = 5  # Maximum positions per 5-minute window
-
 
 
 
