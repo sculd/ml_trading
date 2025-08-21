@@ -9,7 +9,7 @@ import logging
 
 from ml_trading.machine_learning.validation.registry import register_split_method
 from ml_trading.machine_learning.validation.params import ValidationParams
-from ml_trading.machine_learning.validation.purge import PurgeParams, purge
+from ml_trading.machine_learning.validation.purge import purge
 from ml_trading.machine_learning.validation.embargo import next_start_i_by_embargo, get_end_i_by_time
 
 logger = logging.getLogger(__name__)
@@ -63,20 +63,6 @@ class RatioBasedValidationParams(ValidationParams):
             'split_ratio': self.split_ratio,
             ** super().to_dict(),
         }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "RatioBasedValidationParams":
-        assert data.get('validation_method') == 'ratio_based'
-        return cls(
-            split_ratio=data['split_ratio'],
-            fixed_window_size=datetime.timedelta(days=data['fixed_window_size_days']),
-            step_size=datetime.timedelta(days=data['step_size_days']),
-            purge_params=PurgeParams(
-                purge_period=datetime.timedelta(days=data['purge_period_days'])
-            ),
-            embargo_period=datetime.timedelta(days=data['embargo_period_days']),
-            window_type=data['window_type']
-        )
 
 
 def _split_by_ratio(

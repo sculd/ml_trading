@@ -19,7 +19,8 @@ from market_data.feature.param import SequentialFeatureParam
 from market_data.target.param import TargetParamsBatch, TargetParams
 from market_data.machine_learning.resample.calc import CumSumResampleParams
 from ml_trading.research.backtest import BacktestConfig
-from ml_trading.machine_learning.validation.params import EventBasedValidationParams
+from ml_trading.machine_learning.validation.split_methods.event_based import EventBasedValidationParams
+from ml_trading.machine_learning.validation.split_methods.event_based_fixed_size import EventBasedFixedSizeValidationParams
 
 import ml_trading.machine_learning.validation.validation
 import ml_trading.research.backtest
@@ -60,6 +61,16 @@ if __name__ == '__main__':
         embargo_period = datetime.timedelta(days=0),
         window_type='fixed',
         initial_training_fixed_window_size = datetime.timedelta(days=30),
+        step_event_size = 400,
+        validation_fixed_event_size = 400,
+        test_fixed_event_size= 0,
+    )
+    
+    validation_params_fixed_size = EventBasedFixedSizeValidationParams(
+        purge_params = ml_trading.machine_learning.validation.validation.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
+        embargo_period = datetime.timedelta(days=0),
+        window_type='fixed',
+        training_event_size = 1000,
         step_event_size = 400,
         validation_fixed_event_size = 400,
         test_fixed_event_size= 0,
