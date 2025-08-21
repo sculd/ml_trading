@@ -131,7 +131,7 @@ def demonstrate_custom_split_function():
         validation_params: RatioBasedValidationParams,
     ) -> List[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
         """Simple 80/20 holdout split with no test set."""
-        from ml_trading.machine_learning.validation.common import purge
+        from ml_trading.machine_learning.validation.purge import purge
         
         # Use purge function from common module
         ml_data = purge(ml_data, validation_params.purge_params)

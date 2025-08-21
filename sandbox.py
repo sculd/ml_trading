@@ -19,7 +19,7 @@ from market_data.feature.param import SequentialFeatureParam
 from market_data.target.param import TargetParamsBatch, TargetParams
 from market_data.machine_learning.resample.calc import CumSumResampleParams
 from ml_trading.research.backtest import BacktestConfig
-from ml_trading.machine_learning.validation.params import ValidationParamsType, EventBasedValidationParams
+from ml_trading.machine_learning.validation.params import EventBasedValidationParams
 
 import ml_trading.machine_learning.validation.validation
 import ml_trading.research.backtest

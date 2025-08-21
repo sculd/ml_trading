@@ -2,16 +2,80 @@
 Ratio-based validation split method.
 """
 import pandas as pd
+from dataclasses import dataclass, field
 import datetime
 from typing import List, Tuple
 import logging
 
 from ml_trading.machine_learning.validation.registry import register_split_method
-from ml_trading.machine_learning.validation.params import RatioBasedValidationParams
-from ml_trading.machine_learning.validation.common import purge
+from ml_trading.machine_learning.validation.params import ValidationParams
+from ml_trading.machine_learning.validation.purge import PurgeParams, purge
 
 logger = logging.getLogger(__name__)
 
+
+@dataclass 
+class RatioBasedValidationParams(ValidationParams):
+    """
+    Validation parameters using ratio-based splits.
+    
+    This approach splits data based on percentage ratios (e.g., 70% train, 20% validation, 10% test).
+    Used by create_train_validation_test_splits().
+    """
+    # Training window sizing
+    fixed_window_period: datetime.timedelta = field(default_factory=lambda: datetime.timedelta(days=100))
+    
+    # Event-based sizing
+    step_time_delta: datetime.timedelta = field(default_factory=lambda: datetime.timedelta(days=100))
+
+    # Split ratios
+    split_ratio: List[float] = None  # [train_ratio, validation_ratio, test_ratio]
+    
+    def __post_init__(self):
+        if self.split_ratio is None:
+            self.split_ratio = [0.7, 0.2, 0.1]
+        
+        # Validate split ratios
+        if len(self.split_ratio) != 3:
+            raise ValueError("split_ratio must be a list of three floats")
+        if abs(sum(self.split_ratio) - 1.0) > 1e-10:
+            raise ValueError("split_ratio must sum to 1.0")
+    
+    def get_validation_method(self) -> str:
+        return "ratio_based"
+    
+    @property
+    def train_ratio(self) -> float:
+        return self.split_ratio[0]
+    
+    @property
+    def validation_ratio(self) -> float:
+        return self.split_ratio[1]
+    
+    @property
+    def test_ratio(self) -> float:
+        return self.split_ratio[2]
+    
+    def to_dict(self) -> dict:
+        return {
+            'validation_method': self.get_validation_method(),
+            'split_ratio': self.split_ratio,
+            ** super().to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RatioBasedValidationParams":
+        assert data.get('validation_method') == 'ratio_based'
+        return cls(
+            split_ratio=data['split_ratio'],
+            fixed_window_size=datetime.timedelta(days=data['fixed_window_size_days']),
+            step_size=datetime.timedelta(days=data['step_size_days']),
+            purge_params=PurgeParams(
+                purge_period=datetime.timedelta(days=data['purge_period_days'])
+            ),
+            embargo_period=datetime.timedelta(days=data['embargo_period_days']),
+            window_type=data['window_type']
+        )
 
 def _next_start_i_by_embargo(
         ml_data: pd.DataFrame,

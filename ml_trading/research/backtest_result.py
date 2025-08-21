@@ -6,7 +6,6 @@ import os
 from typing import Optional, List, Dict, Any, Union
 from dataclasses import dataclass
 from ml_trading.research.trade_stats import TradeStats
-from ml_trading.machine_learning.validation.params import ValidationParamsType
 from ml_trading.research.backtest_config import BacktestConfig
 
 logger = logging.getLogger(__name__)
@@ -70,7 +69,7 @@ class BacktestResult:
         return self.backtest_config.forward_period
     
     @property
-    def validation_params(self) -> ValidationParamsType:
+    def validation_params(self) -> Any:
         return self.backtest_config.validation_params
     
     @property

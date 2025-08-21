@@ -2,15 +2,70 @@
 Event-based validation split method.
 """
 import pandas as pd
+from dataclasses import dataclass, field
 import datetime
 from typing import List, Tuple
 import logging
 
 from ml_trading.machine_learning.validation.registry import register_split_method
-from ml_trading.machine_learning.validation.params import EventBasedValidationParams
-from ml_trading.machine_learning.validation.common import purge
+from ml_trading.machine_learning.validation.params import ValidationParams
+from ml_trading.machine_learning.validation.purge import PurgeParams, purge
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class EventBasedValidationParams(ValidationParams):
+    """
+    Validation parameters using fixed event counts.
+    
+    This approach uses fixed numbers of events/samples for validation and test sets.
+    Used by create_split_moving_forward().
+    """
+    # Training window sizing
+    initial_training_fixed_window_size: datetime.timedelta = field(default_factory=lambda: datetime.timedelta(days=100))
+    
+    # Event-based sizing
+    step_event_size: int = 500
+    validation_fixed_event_size: int = 300
+    test_fixed_event_size: int = 150
+    
+    def __post_init__(self):
+        # Validate event sizes
+        if self.validation_fixed_event_size < 0:
+            raise ValueError("validation_fixed_event_size must be non-negative")
+        if self.test_fixed_event_size < 0:
+            raise ValueError("test_fixed_event_size must be non-negative")
+        if self.step_event_size <= 0:
+            raise ValueError("step_event_size must be positive")
+    
+    def get_validation_method(self) -> str:
+        return "event_based"
+    
+    def to_dict(self) -> dict:
+        return {
+            'validation_method': self.get_validation_method(),
+            'initial_training_window_days': self.initial_training_fixed_window_size.days,
+            'step_event_size': self.step_event_size,
+            'validation_fixed_event_size': self.validation_fixed_event_size,
+            'test_fixed_event_size': self.test_fixed_event_size,
+            ** super().to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "EventBasedValidationParams":
+        assert data.get('validation_method') == 'event_based'
+        return cls(
+            initial_training_fixed_window_size=datetime.timedelta(days=data['initial_training_window_days']),
+            step_event_size=data['step_event_size'],
+            validation_fixed_event_size=data['validation_fixed_event_size'],
+            test_fixed_event_size=data['test_fixed_event_size'],
+            purge_params=PurgeParams(
+                purge_period=datetime.timedelta(days=data['purge_period_days'])
+            ),
+            embargo_period=datetime.timedelta(days=data['embargo_period_days']),
+            window_type=data['window_type']
+        )
 
 
 def _next_start_i_by_embargo(

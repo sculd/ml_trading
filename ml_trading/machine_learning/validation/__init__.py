@@ -25,11 +25,14 @@ from ml_trading.machine_learning.validation.registry import (
 )
 
 from ml_trading.machine_learning.validation.params import (
-    PurgeParams,
     ValidationParams,
     RatioBasedValidationParams,
     EventBasedValidationParams,
-    ValidationParamsType,
+)
+
+from ml_trading.machine_learning.validation.purge import (
+    PurgeParams,
+    purge,
 )
 
 from ml_trading.machine_learning.validation.validation import (
@@ -37,7 +40,6 @@ from ml_trading.machine_learning.validation.validation import (
 )
 
 from ml_trading.machine_learning.validation.common import (
-    purge,
     dedupe_validation_test_data,
     combine_validation_dfs,
 )

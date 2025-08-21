@@ -1,16 +1,15 @@
 import dataclasses
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from market_data.ingest.common import CacheContext
 
-from ml_trading.machine_learning.validation.params import ValidationParamsType
-
+from
 
 
 @dataclasses.dataclass
 class BacktestConfig:
     cache_context: CacheContext
-    validation_params: ValidationParamsType
+    validation_params: Any
     forward_period: str # e.g. "10m"
     tp_label: str # "30" for 3%
     target_column: str

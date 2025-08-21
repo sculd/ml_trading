@@ -5,13 +5,12 @@ This module provides the main create_splits function that uses the registry
 to dispatch to different split method implementations.
 """
 import pandas as pd
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
 import logging
 
 from ml_trading.machine_learning.validation.params import (
     RatioBasedValidationParams, 
     EventBasedValidationParams,
-    ValidationParamsType,
 )
 from ml_trading.machine_learning.validation.registry import get_split_method
 
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def create_splits(
     ml_data: pd.DataFrame,
-    validation_params: ValidationParamsType,
+    validation_params: Any,
     method: Optional[str] = None,
 ) -> List[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
     """

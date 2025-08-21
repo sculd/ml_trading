@@ -57,7 +57,6 @@ class SVMModel(ml_trading.models.model.Model):
 def train_svm_model(
     train_df: pd.DataFrame,
     target_column: str,
-    random_state: int = 42,
     svm_params: Dict[str, Any] = None,
 ) -> SVMModel:
     """
@@ -67,15 +66,6 @@ def train_svm_model(
         Trained RandomForestModel instance
     """
     X_train, y_train, _, _, _ = into_X_y(train_df, target_column, use_scaler=False)
-    
-    # Split into train and test sets
-    '''
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
-    '''
-    #print(X_train.info())
-    #print(X_test.info())
     
     # Print target label distribution in training set
     print("\nTraining set target label distribution:")
