@@ -3,8 +3,6 @@ from typing import List, Optional, Any
 
 from market_data.ingest.common import CacheContext
 
-from
-
 
 @dataclasses.dataclass
 class BacktestConfig:

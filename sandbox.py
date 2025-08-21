@@ -19,6 +19,7 @@ from market_data.feature.param import SequentialFeatureParam
 from market_data.target.param import TargetParamsBatch, TargetParams
 from market_data.machine_learning.resample.calc import CumSumResampleParams
 from ml_trading.research.backtest import BacktestConfig
+from ml_trading.machine_learning.validation.purge import PurgeParams
 from ml_trading.machine_learning.validation.split_methods.event_based import EventBasedValidationParams
 from ml_trading.machine_learning.validation.split_methods.event_based_fixed_size import EventBasedFixedSizeValidationParams
 
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     )
 
     validation_params = EventBasedValidationParams(
-        purge_params = ml_trading.machine_learning.validation.validation.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
+        purge_params = PurgeParams(purge_period = datetime.timedelta(minutes=30)),
         embargo_period = datetime.timedelta(days=0),
         window_type='fixed',
         initial_training_fixed_window_size = datetime.timedelta(days=30),
@@ -67,23 +68,23 @@ if __name__ == '__main__':
     )
     
     validation_params_fixed_size = EventBasedFixedSizeValidationParams(
-        purge_params = ml_trading.machine_learning.validation.validation.PurgeParams(purge_period = datetime.timedelta(minutes=30)),
+        purge_params = PurgeParams(purge_period = datetime.timedelta(minutes=30)),
         embargo_period = datetime.timedelta(days=0),
         window_type='fixed',
         training_event_size = 1000,
         step_event_size = 400,
-        validation_fixed_event_size = 400,
-        test_fixed_event_size= 0,
+        validation_event_size = 400,
+        test_event_size= 0,
     )
     
     backtest_config = BacktestConfig(
         cache_context = CacheContext(DATASET_MODE.OKX, EXPORT_MODE.BY_MINUTE, AGGREGATION_MODE.TAKE_LATEST),
-        validation_params = validation_params,
+        validation_params = validation_params_fixed_size,
         forward_period = forward_period,
         tp_label = tp_label,
         target_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}_score',
         feature_column_prefixes=[],
-        model_class_id = 'random_forest_regression',
+        model_class_id = 'svm_regression',
     )
 
     backtest_result = ml_trading.research.backtest.run_with_feature_column_prefix(
