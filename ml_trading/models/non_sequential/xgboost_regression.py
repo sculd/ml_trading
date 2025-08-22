@@ -6,54 +6,27 @@ import xgboost as xgb
 from typing import List, Tuple, Dict, Any
 from ml_trading.models.util import into_X_y
 import ml_trading.models.model
+from ml_trading.models.single_model_save_load_mixin import SingleModelSaveLoadMixin
 import os
+import joblib
 from ml_trading.models.registry import register_model, register_train_function
 
 _model_label = "xgboost"
 
 @register_model(_model_label)
-class XGBoostModel(ml_trading.models.model.Model):
+class XGBoostModel(SingleModelSaveLoadMixin, ml_trading.models.model.Model):
     def __init__(
         self, 
         model_name: str,
         columns: List[str],
         target: str,
-        xgb_model: xgb.XGBRegressor,
+        model: xgb.XGBRegressor,
         ):
         super().__init__(model_name, columns, target)
-        self.xgb_model = xgb_model
+        self.model = model
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        return self.xgb_model.predict(X)
-    
-    def save(self, model_id: str):
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(os.path.abspath(model_id)), exist_ok=True)
-        
-        # Save the XGBoost model
-        model_filename = f"{model_id}.xgb"
-        self.xgb_model.save_model(model_filename)
-        print(f"Model saved to {model_filename}")
-        self.save_metadata(model_id)
-
-    @classmethod
-    def load(cls, model_id: str):
-        metadata = ml_trading.models.model.Model.load_metadata(model_id)
-        # Load XGBoost model
-        model_filename = f"{model_id}.xgb"
-        if not os.path.exists(model_filename):
-            raise FileNotFoundError(f"Model file not found: {model_filename}")
-            
-        xgb_model = xgb.XGBRegressor(n_jobs=-1)
-        xgb_model.load_model(model_filename)
-        
-        # Create and return XGBoostModel instance
-        return cls(
-            model_name=metadata['model_name'],
-            columns=metadata['columns'],
-            target=metadata['target'],
-            xgb_model=xgb_model
-        )
+        return self.model.predict(X)
 
 @register_train_function(_model_label)
 def train_xgboost_model(
@@ -68,7 +41,6 @@ def train_xgboost_model(
     Args:
         train_df: Training data DataFrame
         target_column: Name of the target column
-        forward_return_column: Name of the forward return column
         random_state: Random seed for reproducibility
         xgb_params: Optional XGBoost parameters
         
@@ -122,6 +94,6 @@ def train_xgboost_model(
         "xgboost_model",
         columns=X_train.columns.tolist(),
         target=target_column,
-        xgb_model=xgb_model,
+        model=xgb_model,
     )
     return model

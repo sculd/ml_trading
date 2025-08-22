@@ -13,9 +13,8 @@ import market_data.ingest.common
 from market_data.ingest.common import CacheContext, DATASET_MODE, EXPORT_MODE, AGGREGATION_MODE
 import market_data.machine_learning.resample
 import market_data.feature.registry
-from market_data.feature.label import FeatureLabel, FeatureLabelCollection
-from market_data.machine_learning.ml_data.cache import load_cached_ml_data, calculate_and_cache_ml_data
-from market_data.feature.param import SequentialFeatureParam
+from market_data.feature.label import FeatureLabel, FeatureLabelCollection, FeatureLabelCollectionsManager
+from market_data.machine_learning.ml_data.cache import load_cached_ml_data, calculate_and_cache_and_load_ml_data
 from market_data.target.param import TargetParamsBatch, TargetParams
 from market_data.machine_learning.resample.calc import CumSumResampleParams
 from ml_trading.research.backtest import BacktestConfig
@@ -44,15 +43,16 @@ tp_label = "30"
 forward_period = "10m"
 
 if __name__ == '__main__':
+    labels_manager = FeatureLabelCollectionsManager()
     feature_labels = market_data.feature.registry.list_registered_features('all')
     feature_collection = FeatureLabelCollection()
     for feature_label in feature_labels:
         feature_collection = feature_collection.with_feature_label(FeatureLabel(feature_label))
 
-    ml_data = load_cached_ml_data(
+    ml_data = calculate_and_cache_and_load_ml_data(
         CacheContext(DATASET_MODE.OKX, EXPORT_MODE.BY_MINUTE, AGGREGATION_MODE.TAKE_LATEST),
         time_range=time_range,
-        feature_collection = FeatureLabelCollection(),
+        feature_collection = labels_manager.load("returns"),
         target_params_batch=target_params_batch,
         resample_params=CumSumResampleParams(price_col = 'close', threshold = 0.1),
     )
@@ -71,9 +71,9 @@ if __name__ == '__main__':
         purge_params = PurgeParams(purge_period = datetime.timedelta(minutes=30)),
         embargo_period = datetime.timedelta(days=0),
         window_type='fixed',
-        training_event_size = 1000,
-        step_event_size = 400,
-        validation_event_size = 400,
+        training_event_size = 200,
+        step_event_size = 200,
+        validation_event_size = 200,
         test_event_size= 0,
     )
     
@@ -84,7 +84,7 @@ if __name__ == '__main__':
         tp_label = tp_label,
         target_column = f'label_long_tp{tp_label}_sl{tp_label}_{forward_period}_score',
         feature_column_prefixes=[],
-        model_class_id = 'svm_regression',
+        model_class_id = 'random_forest_regression',
     )
 
     backtest_result = ml_trading.research.backtest.run_with_feature_column_prefix(
@@ -102,10 +102,25 @@ if __name__ == '__main__':
     # Split the data into full period and last month
     last_month_df = backtest_result.validation_df[backtest_result.validation_df.index.get_level_values('timestamp') >= one_month_ago]
 
+    threshold = 0.1
     print("\nFull period")
-    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(backtest_result.validation_df, threshold=0.1, tp_label=tp_label)
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(backtest_result.validation_df, threshold=threshold, tp_label=tp_label)
     print("\nLast month")
-    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(last_month_df, threshold=0.1, tp_label=tp_label)
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(last_month_df, threshold=threshold, tp_label=tp_label)
+
+    threshold = 0.3
+    print("\nFull period")
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(backtest_result.validation_df, threshold=threshold, tp_label=tp_label)
+    print("\nLast month")
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(last_month_df, threshold=threshold, tp_label=tp_label)
+
+    threshold = 0.5
+    print("\nFull period")
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(backtest_result.validation_df, threshold=threshold, tp_label=tp_label)
+    print("\nLast month")
+    trade_results = ml_trading.research.trade_stats.get_and_print_trade_stats(last_month_df, threshold=threshold, tp_label=tp_label)
+
+
     #'''
 
 
