@@ -17,13 +17,13 @@ class SVMModel(ml_trading.models.model.Model):
         model_name: str,
         columns: List[str],
         target: str,
-        svm_model: svm.SVR,
+        model: svm.SVR,
         ):
         super().__init__(model_name, columns, target)
-        self.svm_model = svm_model
+        self.model = model
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        return self.svm_model.predict(X)
+        return self.model.predict(X)
     
     def save(self, model_id: str):
         # Create directory if it doesn't exist
@@ -31,7 +31,7 @@ class SVMModel(ml_trading.models.model.Model):
         
         # Save the Random Forest model using joblib
         model_filename = f"{model_id}.pkl"
-        joblib.dump(self.svm_model, model_filename)
+        joblib.dump(self.model, model_filename)
         print(f"Model saved to {model_filename}")
         self.save_metadata(model_id)
 
@@ -43,14 +43,14 @@ class SVMModel(ml_trading.models.model.Model):
         if not os.path.exists(model_filename):
             raise FileNotFoundError(f"Model file not found: {model_filename}")
             
-        svm_model = joblib.load(model_filename)
+        model = joblib.load(model_filename)
         
         # Create and return RandomForestModel instance
         return cls(
             model_name=metadata['model_name'],
             columns=metadata['columns'],
             target=metadata['target'],
-            svm_model=svm_model
+            model=model
         )
 
 @register_train_function(_model_label)
@@ -83,13 +83,13 @@ def train_svm_model(
         }
     
     # Initialize and train the model
-    svm_model = svm.SVR(**svm_params)
-    svm_model.fit(X_train.values, y_train.values)
+    model = svm.SVR(**svm_params)
+    model.fit(X_train.values, y_train.values)
     
     model = SVMModel(
         "svm_model",
         columns=X_train.columns.tolist(),
         target=target_column,
-        svm_model=svm_model,
+        model=model,
     )
     return model

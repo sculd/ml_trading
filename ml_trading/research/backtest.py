@@ -59,7 +59,9 @@ def run_with_feature_column_prefix(
     
     tpsl_return_column = f'label_long_tp{backtest_config.tp_label}_sl{backtest_config.tp_label}_{backtest_config.forward_period}_return'
     forward_return_column = f'label_forward_return_{backtest_config.forward_period}'
-    ml_data = ml_data.dropna(subset=[backtest_config.target_column, forward_return_column])
+    feature_columns = [c for c in ml_data.columns if 'label_' not in c]
+    ml_data = ml_data.dropna(subset=feature_columns + [backtest_config.target_column, forward_return_column])
+
     data_sets = ml_trading.machine_learning.validation.validation.create_splits(
         ml_data=ml_data,
         validation_params=backtest_config.validation_params,
