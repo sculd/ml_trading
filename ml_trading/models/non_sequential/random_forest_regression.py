@@ -1,14 +1,10 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.ensemble import RandomForestRegressor
-import joblib
-from typing import List, Tuple, Dict, Any
+from typing import List, Dict, Any
 from ml_trading.models.util import into_X_y
 import ml_trading.models.model
 from ml_trading.models.single_model_save_load_mixin import SingleModelSaveLoadMixin
-import os
 from ml_trading.models.registry import register_model, register_train_function
 
 _model_label = "random_forest_regression"
@@ -38,12 +34,6 @@ def train_random_forest_model(
     """
     Train a Random Forest model on the provided data.
     
-    Args:
-        train_df: Training data DataFrame
-        target_column: Name of the target column
-        random_state: Random seed for reproducibility
-        rf_params: Optional Random Forest parameters
-        
     Returns:
         Trained RandomForestModel instance
     """
@@ -58,15 +48,9 @@ def train_random_forest_model(
     #print(X_train.info())
     #print(X_test.info())
     
-    # Print target label distribution in training set
     print("\nTraining set target label distribution:")
-    total_samples = len(y_train)
-    up_samples = np.sum(y_train >= 1.)
-    down_samples = np.sum(y_train <= -1.0)
-    neutral_samples = np.sum((y_train < 1.) & (y_train > -1.0))
-    
-    print(f"Total samples: {total_samples}, Positive returns: {up_samples} ({up_samples/total_samples*100:.2f}%), Negative returns: {down_samples} ({down_samples/total_samples*100:.2f}%), Neutral returns: {neutral_samples} ({neutral_samples/total_samples*100:.2f}%)")
-    
+    ml_trading.models.model.print_target_label_distribution(y_train)
+
     # Default Random Forest parameters if none provided
     if rf_params is None:
         rf_params = {
