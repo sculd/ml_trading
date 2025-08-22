@@ -79,7 +79,6 @@ def train_nb_model(
     # Default Random Forest parameters if none provided
     if nb_params is None:
         nb_params = {
-            'verbose': 0
         }
     
     # Initialize and train the model
