@@ -15,10 +15,13 @@ if __name__ == '__main__':
         FeatureLabelCollection().\
             with_feature_label(FeatureLabel("returns")).\
                 with_feature_label(FeatureLabel("time_of_day")), "returns_with_time_of_day")
+    labels_manager.save(FeatureLabelCollection().with_feature_label(FeatureLabel("ffd_zscore")), "ffd_zscore")
+    labels_manager.save(FeatureLabelCollection().with_feature_label(FeatureLabel("bollinger")), "bollinger")
+    labels_manager.save(FeatureLabelCollection().with_feature_label(FeatureLabel("indicators")), "indicators")
     
     print(labels_manager.list_tags())
 
-    print(labels_manager.load("returns_with_time_of_day"))
+    print(labels_manager.load("ffd_zscore"))
     
     feature_collection = FeatureLabelCollection()
     feature_labels = market_data.feature.registry.list_registered_features('all')
@@ -27,3 +30,6 @@ if __name__ == '__main__':
     for feature_label in feature_labels:
         feature_collection = feature_collection.with_feature_label(FeatureLabel(feature_label))
 
+    labels_manager.save(feature_collection, "all")
+
+    print(labels_manager.list_tags())
