@@ -2,11 +2,12 @@ import dataclasses
 from typing import List, Optional, Any
 
 from market_data.ingest.common import CacheContext
-
+from market_data.feature.label import FeatureLabelCollection
 
 @dataclasses.dataclass
 class BacktestConfig:
     cache_context: CacheContext
+    feature_collection: FeatureLabelCollection
     validation_params: Any
     forward_period: str # e.g. "10m"
     tp_label: str # "30" for 3%

@@ -312,6 +312,23 @@ class BacktestResult:
             'notes': self.notes,
         }
     
+    def to_flatten_dict(self):
+        def flatten_dict(d, prefix=""):
+            """Flatten nested dictionary and convert values to numeric where possible"""
+            result = {}
+            for key, value in d.items():
+                new_key = f"{prefix}_{key}" if prefix else key
+                if isinstance(value, dict):
+                    result.update(flatten_dict(value, new_key))
+                elif isinstance(value, (int, float)):
+                    result[new_key] = value
+                else:
+                    # Skip non-numeric values for metrics
+                    continue
+            return result       
+        d = self.to_dict()
+        return flatten_dict(d)
+
     @classmethod
     def from_backtest_run(
         cls,
